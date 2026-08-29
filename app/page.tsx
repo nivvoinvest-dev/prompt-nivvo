@@ -1906,6 +1906,126 @@ function toggleFavorite(promptId: number) {
     </div>
 
   </div>
+{/* MENU MOBILE */}
+<nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-white/10 bg-[#080a0f]/95 px-2 py-3 backdrop-blur-xl lg:hidden">
+
+
+  {/* INÍCIO */}
+  <button
+    onClick={() => {
+      setActivePage("home");
+      setShowFavorites(false);
+
+
+      setTimeout(() => {
+        document.getElementById("categorias")?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }, 100);
+    }}
+    className="flex flex-col items-center gap-1 px-3 py-1 text-[10px] text-gray-400 transition hover:text-blue-400"
+  >
+    <span className="text-xl">⌂</span>
+    Início
+  </button>
+
+
+
+
+  {/* EXPLORAR */}
+  <button
+    onClick={() => {
+      setActivePage("home");
+      setShowFavorites(false);
+
+
+      setTimeout(() => {
+        document.getElementById("biblioteca")?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }, 100);
+    }}
+    className="flex flex-col items-center gap-1 px-3 py-1 text-[10px] text-gray-400 transition hover:text-blue-400"
+  >
+    <span className="text-xl">⌕</span>
+    Explorar
+  </button>
+
+
+
+
+  {/* FAVORITOS */}
+  <button
+    onClick={() => {
+      setActivePage("home");
+      setShowFavorites(true);
+
+
+      setTimeout(() => {
+        document.getElementById("lista-prompts")?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }, 100);
+    }}
+    className="flex flex-col items-center gap-1 px-3 py-1 text-[10px] text-gray-400 transition hover:text-blue-400"
+  >
+    <span className="text-xl">
+      {showFavorites ? "♥" : "♡"}
+    </span>
+    Favoritos
+  </button>
+
+
+
+
+  {/* RECENTES */}
+  <button
+    onClick={() => {
+      setActivePage("recentes");
+      setShowFavorites(false);
+
+
+      setTimeout(() => {
+        document
+          .getElementById("recentes")
+          ?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+      }, 100);
+    }}
+    className="flex flex-col items-center gap-1 px-3 py-1 text-[10px] text-gray-400 transition hover:text-blue-400"
+  >
+    <span className="text-xl">◷</span>
+    Recentes
+  </button>
+
+
+
+
+  {/* HUB BOSS */}
+  <button
+    onClick={() => {
+      setActivePage("hub-boss");
+      setShowFavorites(false);
+
+
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
+    }}
+    className="flex flex-col items-center gap-1 px-3 py-1 text-[10px] text-blue-400 transition hover:text-blue-300"
+  >
+    <span className="text-xl">🔥</span>
+    Hub Boss
+  </button>
+
+
+</nav>
 
 </main>
   );
