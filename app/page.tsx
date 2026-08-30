@@ -372,8 +372,7 @@ function toggleFavorite(promptId: number) {
 
     {/* TÍTULO */}
 
-
-    <div className="mb-10">
+<div id="recentes" className="mb-10">
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-500">
         Sua atividade
       </p>
@@ -1936,17 +1935,17 @@ function toggleFavorite(promptId: number) {
   {/* EXPLORAR */}
   <button
     onClick={() => {
-      setActivePage("home");
-      setShowFavorites(false);
+  setActivePage("explorar");
+  setShowFavorites(false);
 
+  setTimeout(() => {
+    document.getElementById("biblioteca")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, 100);
+}}
 
-      setTimeout(() => {
-        document.getElementById("biblioteca")?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-      }, 100);
-    }}
     className="flex flex-col items-center gap-1 px-3 py-1 text-[10px] text-gray-400 transition hover:text-blue-400"
   >
     <span className="text-xl">⌕</span>
