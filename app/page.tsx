@@ -214,11 +214,14 @@ function toggleFavorite(promptId: number) {
 
   <button
   onClick={() => {
-    setShowFavorites(false);
-    document.getElementById("biblioteca")?.scrollIntoView({
-      behavior: "smooth",
-    });
-  }}
+  setActivePage("explorar");
+  setShowFavorites(false);
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth",
+  });
+}}
   className="mb-2 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm text-gray-500 transition-all duration-200 hover:bg-white/5 hover:text-white"
 >
   <span className="text-base">⌕</span>
@@ -1607,138 +1610,134 @@ function toggleFavorite(promptId: number) {
 )}
 
 
-      {/* HERO */}
+      {/* CONTEÚDO PRINCIPAL — ESCONDIDO NO HUB BOSS */}
 
-<section
-  id="biblioteca"
-  className={`mx-auto max-w-7xl px-6 pb-12 pt-16 lg:px-10 lg:pt-20 ${
-  activePage === "hub-boss" ? "hidden" : ""
-}`}
+{activePage !== "hub-boss" && (
+  <>
+    {/* HERO */}
 
->
+    <section
+      id="biblioteca"
+      className="mx-auto max-w-7xl px-6 pb-12 pt-16 lg:px-10 lg:pt-20"
+    >
+      <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-6 shadow-2xl shadow-black/20 md:p-8">
 
+        <div className="flex flex-col gap-8">
 
-  <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-6 shadow-2xl shadow-black/20 md:p-8">
+          {/* HERO */}
 
-    <div className="flex flex-col gap-8">
+          <div>
+            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-blue-500">
+              Biblioteca NIVVO
+            </p>
 
-      {/* HERO */}
+            <h2 className="max-w-4xl text-4xl font-bold leading-tight tracking-tight md:text-6xl lg:text-7xl">
+              Sua biblioteca de
+              <span className="block text-gray-500">
+                prompts para IA.
+              </span>
+            </h2>
 
-      <div>
+            <p className="mt-6 max-w-2xl text-base leading-7 text-gray-400 md:text-lg">
+              Encontre prompts prontos para criação de imagens,
+              vídeos e conteúdos com inteligência artificial.
+            </p>
+          </div>
 
-        <p className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-blue-500">
-          Biblioteca NIVVO
-        </p>
+          {/* SEARCH */}
 
-        <h2 className="max-w-4xl text-4xl font-bold leading-tight tracking-tight md:text-6xl lg:text-7xl">
-          Sua biblioteca de
-          <span className="block text-gray-500">
-            prompts para IA.
-          </span>
-        </h2>
+          <div className="flex w-full items-center rounded-2xl border border-white/10 bg-[#0d1016] px-5 py-1 shadow-lg shadow-black/20 transition-all duration-300 focus-within:border-blue-500/50 focus-within:bg-[#10141c] focus-within:shadow-blue-500/10">
 
-        <p className="mt-6 max-w-2xl text-base leading-7 text-gray-400 md:text-lg">
-          Encontre prompts prontos para criação de imagens,
-          vídeos e conteúdos com inteligência artificial.
-        </p>
+            <span className="mr-3 text-lg text-gray-500">
+              🔎
+            </span>
 
-      </div>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar prompts..."
+              className="w-full bg-transparent py-4 text-sm text-white outline-none placeholder:text-gray-600"
+            />
 
-      {/* SEARCH */}
+          </div>
 
-      <div className="flex w-full items-center rounded-2xl border border-white/10 bg-[#0d1016] px-5 py-1 shadow-lg shadow-black/20 transition-all duration-300 focus-within:border-blue-500/50 focus-within:bg-[#10141c] focus-within:shadow-blue-500/10">
+          {/* FILTERS */}
 
-        <span className="mr-3 text-lg text-gray-500">
-          🔎
-        </span>
+          <div className="flex flex-col gap-4 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
 
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar prompts..."
-          className="w-full bg-transparent py-4 text-sm text-white outline-none placeholder:text-gray-600"
-        />
+            <div className="flex items-center gap-3">
 
-      </div>
+              <span className="text-xs font-medium uppercase tracking-wider text-gray-500">
+                Tipo
+              </span>
 
-      {/* FILTERS */}
+              <select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className="appearance-none rounded-xl border border-white/10 bg-[#0d1016] px-5 py-3 pr-10 text-sm font-medium text-gray-300 shadow-lg shadow-black/20 outline-none transition-all duration-300 hover:border-blue-500/30 hover:bg-[#10141c] focus:border-blue-500/50 focus:bg-[#10141c] focus:ring-2 focus:ring-blue-500/10"
+              >
+                <option value="Todos">Todos</option>
+                <option value="Vídeos">Vídeos</option>
+                <option value="Imagens">Imagens</option>
+              </select>
 
-      <div className="flex flex-col gap-4 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
+            </div>
 
-        <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-600">
+              Use a busca e os filtros para encontrar o prompt ideal
+            </span>
 
-          <span className="text-xs font-medium uppercase tracking-wider text-gray-500">
-            Tipo
-          </span>
-
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="appearance-none rounded-xl border border-white/10 bg-[#0d1016] px-5 py-3 pr-10 text-sm font-medium text-gray-300 shadow-lg shadow-black/20 outline-none transition-all duration-300 hover:border-blue-500/30 hover:bg-[#10141c] focus:border-blue-500/50 focus:bg-[#10141c] focus:ring-2 focus:ring-blue-500/10"
-          >
-            <option value="Todos">Todos</option>
-            <option value="Vídeos">Vídeos</option>
-            <option value="Imagens">Imagens</option>
-          </select>
+          </div>
 
         </div>
 
-        <span className="text-xs text-gray-600">
-          Use a busca e os filtros para encontrar o prompt ideal
-        </span>
-
       </div>
-
-    </div>
-
-  </div>
-
-</section>
-
+    </section>
 
     {/* CATEGORIES */}
 
-<section
-  id="categorias"
-  className="mx-auto max-w-7xl px-6 pb-16 lg:px-10 lg:pt-8"
->
+    <section
+      id="categorias"
+      className="mx-auto max-w-7xl px-6 pb-16 lg:px-10 lg:pt-8"
+    >
 
+      <div className="mb-4 flex items-center gap-3">
 
-  <div className="mb-4 flex items-center gap-3">
+        <div className="h-px w-8 bg-blue-500/50" />
 
-    <div className="h-px w-8 bg-blue-500/50" />
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
+          Categorias
+        </p>
 
-    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
-      Categorias
-    </p>
+      </div>
 
-  </div>
+      <div className="flex flex-wrap gap-2.5">
 
-  <div className="flex flex-wrap gap-2.5">
+        {[
+          "POV",
+          "UGC",
+          "Mirror Self",
+          "Ultrarrealista",
+          "Outros",
+        ].map((category) => (
+          <button
+            key={category}
+            onClick={() => setSelectedCategory(category)}
+            className={`rounded-xl border px-4 py-2.5 text-xs font-medium transition-all duration-300 ${
+              selectedCategory === category
+                ? "border-blue-500/60 bg-blue-500/15 text-blue-400 shadow-lg shadow-blue-500/20"
+                : "border-white/10 bg-white/[0.02] text-gray-400 hover:-translate-y-0.5 hover:border-blue-500/40 hover:bg-blue-500/10 hover:text-blue-400 hover:shadow-md hover:shadow-blue-500/5"
+            }`}
+          >
+            {category}
+          </button>
+        ))}
 
-    {[
-      "POV",
-      "UGC",
-      "Mirror Self",
-      "Ultrarrealista",
-      "Outros",
-    ].map((category) => (
-      <button
-  key={category}
-  onClick={() => setSelectedCategory(category)}
- className={`rounded-xl border px-4 py-2.5 text-xs font-medium transition-all duration-300 ${
-  selectedCategory === category
-    ? "border-blue-500/60 bg-blue-500/15 text-blue-400 shadow-lg shadow-blue-500/20"
-    : "border-white/10 bg-white/[0.02] text-gray-400 hover:-translate-y-0.5 hover:border-blue-500/40 hover:bg-blue-500/10 hover:text-blue-400 hover:shadow-md hover:shadow-blue-500/5"
-}`}
+      </div>
 
->
-  {category}
-</button>
-
-    ))}
-  </div>
-</section>
+    </section>
+  </>
+)}
 
 
       {/* PROMPTS */}
