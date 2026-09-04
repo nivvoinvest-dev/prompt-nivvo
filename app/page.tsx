@@ -2,67 +2,122 @@
 
 import { useEffect, useState } from "react";
 import { prompts } from "./prompts";
+import { supabase } from "./lib/supabase";
+import { useRouter } from "next/navigation";
+
 
   
 export default function Home() {
+  const router = useRouter();
+
+  // TODOS OS ESTADOS FICAM AQUI EM CIMA
+  const [verificandoAcesso, setVerificandoAcesso] = useState(true);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("Todos");
   const [favorites, setFavorites] = useState<number[]>([]);
   const [recentPrompts, setRecentPrompts] = useState<number[]>([]);
   const [activePage, setActivePage] = useState("home");
   const [showFavorites, setShowFavorites] = useState(false);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [selectedAI, setSelectedAI] = useState("Todas");
+  const [selectedCategory, setSelectedCategory] = useState("Todas");
+
+  // VERIFICA ACESSO
+  useEffect(() => {
+    async function verificarAcesso() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.replace("/login");
+        return;
+      }
+
+      const { data: acesso } = await supabase
+        .from("user_access")
+        .select("active")
+        .eq("email", user.email)
+        .maybeSingle();
+
+      if (!acesso || acesso.active !== true) {
+        await supabase.auth.signOut();
+        router.replace("/login");
+        return;
+      }
+
+      setVerificandoAcesso(false);
+    }
+
+    verificarAcesso();
+  }, [router]);
+
+  // OPÇÕES DE FILTRO
+  const aiOptions = [
+    "Todas",
+    ...new Set(prompts.map((prompt) => prompt.ai)),
+  ];
+
+  const categoryOptions = [
+    "Todas",
+    ...new Set(prompts.map((prompt) => prompt.category)),
+  ];
+
+  // ADICIONAR AOS RECENTES
   const addRecent = (id: number) => {
-  setRecentPrompts((prev) => {
-    const updated = [
-      id,
-      ...prev.filter((item) => item !== id),
-    ].slice(0, 12);
+    setRecentPrompts((prev) => {
+      const updated = [
+        id,
+        ...prev.filter((item) => item !== id),
+      ].slice(0, 12);
 
-    localStorage.setItem(
-      "recentPrompts",
-      JSON.stringify(updated)
+      localStorage.setItem(
+        "recentPrompts",
+        JSON.stringify(updated)
+      );
+
+      return updated;
+    });
+  };
+
+  // CARREGAR FAVORITOS E RECENTES
+  useEffect(() => {
+    const savedFavorites = localStorage.getItem("favorites");
+
+    if (savedFavorites) {
+      setFavorites(JSON.parse(savedFavorites));
+    }
+
+    const savedRecentPrompts =
+      localStorage.getItem("recentPrompts");
+
+    if (savedRecentPrompts) {
+      setRecentPrompts(JSON.parse(savedRecentPrompts));
+    }
+  }, []);
+
+  // ROLAR ATÉ A LISTA DE FAVORITOS
+  useEffect(() => {
+    if (showFavorites) {
+      setTimeout(() => {
+        document
+          .getElementById("lista-prompts")
+          ?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+      }, 150);
+    }
+  }, [showFavorites]);
+
+  // SÓ AGORA PODE HAVER O RETURN CONDICIONAL
+  if (verificandoAcesso) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#07090d] text-white">
+        Verificando seu acesso...
+      </main>
     );
-
-    return updated;
-  });
-};
-
-
- useEffect(() => {
-  const savedFavorites = localStorage.getItem("favorites");
-
-  if (savedFavorites) {
-    setFavorites(JSON.parse(savedFavorites));
   }
-
-  const savedRecentPrompts =
-    localStorage.getItem("recentPrompts");
-
-  if (savedRecentPrompts) {
-    setRecentPrompts(JSON.parse(savedRecentPrompts));
-  }
-}, []);
-useEffect(() => {
-  if (showFavorites) {
-    setTimeout(() => {
-      document.getElementById("lista-prompts")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    }, 150);
-  }
-}, [showFavorites]);
-
-
-const [copiedId, setCopiedId] = useState<number | null>(null);
-const aiOptions = ["Todas", ...new Set(prompts.map((prompt) => prompt.ai))];
-const [selectedAI, setSelectedAI] = useState("Todas");
-const categoryOptions = [
-  "Todas",
-  ...new Set(prompts.map((prompt) => prompt.category)),
-];
-
-const [selectedCategory, setSelectedCategory] = useState("Todas");
 
   const filteredPrompts = prompts.filter((prompt) => {
   const text = (
