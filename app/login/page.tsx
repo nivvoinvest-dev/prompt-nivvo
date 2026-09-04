@@ -15,31 +15,101 @@ export default function Login() {
     setErro("");
     setCarregando(true);
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password: senha,
-    });
+    const emailNormalizado = email.trim().toLowerCase();
 
-    if (error || !data.user) {
-      setErro("E-mail ou senha incorretos.");
-      setCarregando(false);
-      return;
-    }
+    try {
+      /*
+       * 1. AUTENTICAÇÃO NO SUPABASE
+       */
+      const { data, error } =
+        await supabase.auth.signInWithPassword({
+          email: emailNormalizado,
+          password: senha,
+        });
 
-    const { data: acesso, error: acessoError } = await supabase
-      .from("user_access")
-      .select("active")
-      .eq("email", data.user.email)
-      .maybeSingle();
+      if (error || !data.user) {
+        setErro("E-mail ou senha incorretos.");
+        setCarregando(false);
+        return;
+      }
 
-    if (acessoError || !acesso || acesso.active !== true) {
+      /*
+       * 2. VERIFICAR ACESSO DO USUÁRIO
+       *
+       * O usuário autenticado só consegue consultar
+       * o próprio registro graças à política RLS.
+       */
+      const emailUsuario =
+        data.user.email?.trim().toLowerCase();
+
+      if (!emailUsuario) {
+        await supabase.auth.signOut();
+
+        setErro(
+          "Não foi possível identificar o e-mail da conta."
+        );
+
+        setCarregando(false);
+        return;
+      }
+
+      const {
+        data: acesso,
+        error: acessoError,
+      } = await supabase
+        .from("user_access")
+        .select("active, role")
+        .eq("email", emailUsuario)
+        .maybeSingle();
+
+      /*
+       * 3. ERRO AO CONSULTAR O ACESSO
+       */
+      if (acessoError) {
+        console.error(
+          "Erro ao verificar acesso:",
+          acessoError
+        );
+
+        await supabase.auth.signOut();
+
+        setErro(
+          "Não foi possível verificar seu acesso. Tente novamente."
+        );
+
+        setCarregando(false);
+        return;
+      }
+
+      /*
+       * 4. USUÁRIO NÃO CADASTRADO OU BLOQUEADO
+       */
+      if (!acesso || acesso.active !== true) {
+        await supabase.auth.signOut();
+
+        setErro(
+          "Seu acesso não está autorizado ou está inativo."
+        );
+
+        setCarregando(false);
+        return;
+      }
+
+      /*
+       * 5. ACESSO LIBERADO
+       */
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Erro inesperado no login:", error);
+
       await supabase.auth.signOut();
-      setErro("Seu acesso não está autorizado ou está inativo.");
-      setCarregando(false);
-      return;
-    }
 
-    window.location.href = "/";
+      setErro(
+        "Erro ao conectar com o servidor. Tente novamente."
+      );
+
+      setCarregando(false);
+    }
   }
 
   return (
@@ -59,7 +129,10 @@ export default function Login() {
           </p>
         </div>
 
-        <form onSubmit={entrar} className="space-y-5">
+        <form
+          onSubmit={entrar}
+          className="space-y-5"
+        >
           <div>
             <label className="mb-2 block text-sm text-gray-400">
               E-mail
@@ -68,8 +141,11 @@ export default function Login() {
             <input
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) =>
+                setEmail(e.target.value)
+              }
               required
+              autoComplete="email"
               className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none focus:border-blue-500/50"
               placeholder="seu@email.com"
             />
@@ -83,8 +159,11 @@ export default function Login() {
             <input
               type="password"
               value={senha}
-              onChange={(e) => setSenha(e.target.value)}
+              onChange={(e) =>
+                setSenha(e.target.value)
+              }
               required
+              autoComplete="current-password"
               className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none focus:border-blue-500/50"
               placeholder="Sua senha"
             />
@@ -101,7 +180,9 @@ export default function Login() {
             disabled={carregando}
             className="w-full rounded-xl bg-blue-600 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {carregando ? "Entrando..." : "Entrar"}
+            {carregando
+              ? "Entrando..."
+              : "Entrar"}
           </button>
         </form>
       </div>
