@@ -15,6 +15,7 @@ export default function Admin() {
   const router = useRouter();
 
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [busca, setBusca] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
 
@@ -24,68 +25,112 @@ export default function Admin() {
   const [mensagem, setMensagem] = useState("");
 
   useEffect(() => {
-    async function verificarAdmin() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+  async function verificarAdmin() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-      if (!user) {
-        router.replace("/login");
-        return;
-      }
-
-      const { data: acesso, error } = await supabase
-        .from("user_access")
-        .select("id, email, active, role")
-        .eq("email", user.email)
-        .maybeSingle();
-
-      if (
-        error ||
-        !acesso ||
-        acesso.active !== true ||
-        acesso.role !== "admin"
-      ) {
-        router.replace("/");
-        return;
-      }
-
-      const { data: lista, error: listaError } = await supabase
-        .from("user_access")
-        .select("id, email, active, role")
-        .order("id", { ascending: true });
-
-      if (listaError) {
-        setErro("Não foi possível carregar os usuários.");
-      } else {
-        setUsuarios(lista || []);
-      }
-
-      setCarregando(false);
+    if (!user) {
+      router.replace("/login");
+      return;
     }
 
-    verificarAdmin();
-  }, [router]);
-
-  async function alterarAcesso(id: number, ativoAtual: boolean) {
-    const { error } = await supabase
+    const { data: acesso, error } = await supabase
       .from("user_access")
-      .update({ active: !ativoAtual })
-      .eq("id", id);
+      .select("id, email, active, role")
+      .eq("email", user.email)
+      .maybeSingle();
 
-    if (error) {
-      alert("Não foi possível alterar o acesso.");
+    if (
+      error ||
+      !acesso ||
+      acesso.active !== true ||
+      acesso.role !== "admin"
+    ) {
+      router.replace("/");
+      return;
+    }
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      router.replace("/login");
+      return;
+    }
+
+    const resposta = await fetch("/api/admin/users", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    const resultado = await resposta.json();
+
+    if (!resposta.ok) {
+      setErro(
+        resultado.error || "Não foi possível carregar os usuários."
+      );
+    } else {
+      setUsuarios(resultado.usuarios || []);
+    }
+
+    setCarregando(false);
+  }
+
+  verificarAdmin();
+}, [router]);
+
+ async function alterarAcesso(id: number, ativoAtual: boolean) {
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      alert("Sua sessão expirou. Faça login novamente.");
+      router.replace("/login");
+      return;
+    }
+
+    const resposta = await fetch("/api/admin/users", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        id,
+        active: !ativoAtual,
+      }),
+    });
+
+    const resultado = await resposta.json();
+
+    if (!resposta.ok) {
+      alert(
+        resultado.error ||
+          "Não foi possível alterar o acesso."
+      );
       return;
     }
 
     setUsuarios((lista) =>
       lista.map((usuario) =>
         usuario.id === id
-          ? { ...usuario, active: !ativoAtual }
+          ? {
+              ...usuario,
+              active: resultado.usuario.active,
+            }
           : usuario
       )
     );
+  } catch {
+    alert("Erro ao conectar com o servidor.");
   }
+}
 
   async function criarUsuario(e: React.FormEvent) {
     e.preventDefault();
@@ -106,32 +151,34 @@ export default function Admin() {
     setCriando(true);
 
     try {
-     const {
-  data: { session },
-} = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-if (!session?.access_token) {
-  setErro("Sua sessão expirou. Faça login novamente.");
-  setCriando(false);
-  return;
-}
+      if (!session?.access_token) {
+        setErro("Sua sessão expirou. Faça login novamente.");
+        setCriando(false);
+        return;
+      }
 
-const resposta = await fetch("/api/admin/users", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${session.access_token}`,
-  },
-  body: JSON.stringify({
-    email,
-    password: senha,
-  }),
-});
+      const resposta = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          email,
+          password: senha,
+        }),
+      });
 
       const resultado = await resposta.json();
 
       if (!resposta.ok) {
-        setErro(resultado.error || "Não foi possível criar o usuário.");
+        setErro(
+          resultado.error || "Não foi possível criar o usuário."
+        );
         setCriando(false);
         return;
       }
@@ -141,18 +188,30 @@ const resposta = await fetch("/api/admin/users", {
       setEmail("");
       setSenha("");
 
-      const { data: lista } = await supabase
-        .from("user_access")
-        .select("id, email, active, role")
-        .order("id", { ascending: true });
+      const respostaLista = await fetch("/api/admin/users", {
+  method: "GET",
+  headers: {
+    Authorization: `Bearer ${session.access_token}`,
+  },
+});
 
-      setUsuarios(lista || []);
+const resultadoLista = await respostaLista.json();
+
+if (respostaLista.ok) {
+  setUsuarios(resultadoLista.usuarios || []);
+}
     } catch {
       setErro("Erro ao conectar com o servidor.");
     }
 
     setCriando(false);
   }
+
+  const usuariosFiltrados = usuarios.filter((usuario) =>
+    (usuario.email || "")
+      .toLowerCase()
+      .includes(busca.toLowerCase())
+  );
 
   if (carregando) {
     return (
@@ -168,7 +227,9 @@ const resposta = await fetch("/api/admin/users", {
 
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Administração</h1>
+            <h1 className="text-3xl font-bold">
+              Administração
+            </h1>
 
             <p className="mt-2 text-gray-400">
               Gerencie os usuários e seus acessos.
@@ -232,9 +293,22 @@ const resposta = await fetch("/api/admin/users", {
           )}
         </div>
 
+        {/* BUSCAR USUÁRIO */}
+
+        <div className="mb-4">
+          <input
+            type="text"
+            placeholder="Buscar usuário por e-mail..."
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            className="w-full rounded-lg border border-gray-700 bg-[#0b0e13] px-4 py-3 text-white outline-none focus:border-blue-500"
+          />
+        </div>
+
         {/* LISTA DE USUÁRIOS */}
 
         <div className="overflow-hidden rounded-xl border border-gray-800">
+
           <div className="grid grid-cols-4 bg-gray-900 p-4 font-semibold">
             <div>E-mail</div>
             <div>Status</div>
@@ -242,11 +316,12 @@ const resposta = await fetch("/api/admin/users", {
             <div>Ação</div>
           </div>
 
-          {usuarios.map((usuario) => (
+          {usuariosFiltrados.map((usuario) => (
             <div
               key={usuario.id}
               className="grid grid-cols-4 items-center border-t border-gray-800 p-4"
             >
+
               <div className="break-all">
                 {usuario.email}
               </div>
@@ -270,22 +345,32 @@ const resposta = await fetch("/api/admin/users", {
               <div>
                 <button
                   onClick={() =>
-                    alterarAcesso(usuario.id, usuario.active)
+                    alterarAcesso(
+                      usuario.id,
+                      usuario.active
+                    )
                   }
                   className="rounded-lg bg-gray-800 px-3 py-2 hover:bg-gray-700"
                 >
-                  {usuario.active ? "Bloquear" : "Liberar"}
+                  {usuario.active
+                    ? "Bloquear"
+                    : "Liberar"}
                 </button>
               </div>
+
             </div>
           ))}
 
-          {usuarios.length === 0 && !erro && (
+          {usuariosFiltrados.length === 0 && !erro && (
             <div className="p-6 text-center text-gray-400">
-              Nenhum usuário encontrado.
+              {busca
+                ? "Nenhum usuário encontrado para essa busca."
+                : "Nenhum usuário encontrado."}
             </div>
           )}
+
         </div>
+
       </div>
     </main>
   );
