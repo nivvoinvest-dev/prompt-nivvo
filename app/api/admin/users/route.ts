@@ -14,7 +14,10 @@ async function verificarAdmin(request: Request) {
   const authHeader = request.headers.get("authorization");
 
   if (!authHeader?.startsWith("Bearer ")) {
-    return { autorizado: false, supabaseAdmin };
+    return {
+      autorizado: false,
+      supabaseAdmin,
+    };
   }
 
   const token = authHeader.replace("Bearer ", "");
@@ -25,14 +28,18 @@ async function verificarAdmin(request: Request) {
   } = await supabaseAdmin.auth.getUser(token);
 
   if (userError || !user?.email) {
-    return { autorizado: false, supabaseAdmin };
+    return {
+      autorizado: false,
+      supabaseAdmin,
+    };
   }
 
-  const { data: acesso, error: acessoError } = await supabaseAdmin
-    .from("user_access")
-    .select("active, role")
-    .eq("email", user.email)
-    .maybeSingle();
+  const { data: acesso, error: acessoError } =
+    await supabaseAdmin
+      .from("user_access")
+      .select("id, email, active, role")
+      .eq("email", user.email)
+      .maybeSingle();
 
   if (
     acessoError ||
@@ -40,17 +47,21 @@ async function verificarAdmin(request: Request) {
     acesso.active !== true ||
     acesso.role !== "admin"
   ) {
-    return { autorizado: false, supabaseAdmin };
+    return {
+      autorizado: false,
+      supabaseAdmin,
+    };
   }
 
   return {
     autorizado: true,
     supabaseAdmin,
-    emailAdmin: user.email,
   };
 }
 
-// LISTAR USUÁRIOS
+/*
+ * LISTAR USUÁRIOS
+ */
 export async function GET(request: Request) {
   try {
     const { autorizado, supabaseAdmin } =
@@ -58,7 +69,10 @@ export async function GET(request: Request) {
 
     if (!autorizado) {
       return NextResponse.json(
-        { error: "Apenas administradores podem acessar os usuários." },
+        {
+          error:
+            "Apenas administradores podem acessar os usuários.",
+        },
         { status: 403 }
       );
     }
@@ -70,7 +84,9 @@ export async function GET(request: Request) {
 
     if (error) {
       return NextResponse.json(
-        { error: "Não foi possível carregar os usuários." },
+        {
+          error: error.message,
+        },
         { status: 500 }
       );
     }
@@ -80,13 +96,17 @@ export async function GET(request: Request) {
     });
   } catch {
     return NextResponse.json(
-      { error: "Erro interno ao carregar usuários." },
+      {
+        error: "Erro interno ao carregar usuários.",
+      },
       { status: 500 }
     );
   }
 }
 
-// CRIAR USUÁRIO
+/*
+ * CRIAR USUÁRIO
+ */
 export async function POST(request: Request) {
   try {
     const { autorizado, supabaseAdmin } =
@@ -94,7 +114,10 @@ export async function POST(request: Request) {
 
     if (!autorizado) {
       return NextResponse.json(
-        { error: "Apenas administradores podem criar usuários." },
+        {
+          error:
+            "Apenas administradores podem criar usuários.",
+        },
         { status: 403 }
       );
     }
@@ -103,107 +126,151 @@ export async function POST(request: Request) {
 
     if (!email || !password) {
       return NextResponse.json(
-        { error: "E-mail e senha são obrigatórios." },
+        {
+          error: "E-mail e senha são obrigatórios.",
+        },
         { status: 400 }
       );
     }
 
     if (password.length < 6) {
       return NextResponse.json(
-        { error: "A senha precisa ter pelo menos 6 caracteres." },
+        {
+          error:
+            "A senha precisa ter pelo menos 6 caracteres.",
+        },
         { status: 400 }
       );
     }
 
-    const { data, error } =
+    const emailNormalizado = email.trim().toLowerCase();
+
+    const { data: acessoExistente } =
+      await supabaseAdmin
+        .from("user_access")
+        .select("id, email, active, role")
+        .eq("email", emailNormalizado)
+        .maybeSingle();
+
+    if (acessoExistente) {
+      return NextResponse.json(
+        {
+          error:
+            "Este e-mail já possui acesso cadastrado.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const { data: novoUsuario, error: criarErro } =
       await supabaseAdmin.auth.admin.createUser({
-        email,
+        email: emailNormalizado,
         password,
         email_confirm: true,
       });
 
-    if (error) {
+    if (criarErro || !novoUsuario.user) {
       return NextResponse.json(
-        { error: error.message },
+        {
+          error:
+            criarErro?.message ||
+            "Não foi possível criar o usuário.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const { data: acesso, error: acessoError } =
+      await supabaseAdmin
+        .from("user_access")
+        .insert({
+          email: emailNormalizado,
+          active: true,
+          role: "user",
+        })
+        .select("id, email, active, role")
+        .single();
+
+    if (acessoError) {
+      await supabaseAdmin.auth.admin.deleteUser(
+        novoUsuario.user.id
+      );
+
+      return NextResponse.json(
+        {
+          error: acessoError.message,
+        },
         { status: 400 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      user: data.user,
+      usuario: acesso,
     });
   } catch {
     return NextResponse.json(
-      { error: "Erro interno ao criar usuário." },
+      {
+        error: "Erro interno ao criar usuário.",
+      },
       { status: 500 }
     );
   }
 }
 
-// ALTERAR ACESSO
+/*
+ * ALTERAR STATUS DO USUÁRIO
+ */
 export async function PATCH(request: Request) {
   try {
-    const {
-      autorizado,
-      supabaseAdmin,
-      emailAdmin,
-    } = await verificarAdmin(request);
+    const { autorizado, supabaseAdmin } =
+      await verificarAdmin(request);
 
     if (!autorizado) {
       return NextResponse.json(
-        { error: "Apenas administradores podem alterar acessos." },
+        {
+          error:
+            "Apenas administradores podem alterar usuários.",
+        },
         { status: 403 }
       );
     }
 
     const { id, active } = await request.json();
 
-    if (typeof id !== "number" || typeof active !== "boolean") {
+    if (!id) {
       return NextResponse.json(
-        { error: "Dados inválidos." },
+        {
+          error: "ID do usuário é obrigatório.",
+        },
         { status: 400 }
       );
     }
 
-    // Busca o usuário que será alterado
-    const { data: usuario, error: usuarioError } =
-      await supabaseAdmin
-        .from("user_access")
-        .select("id, email, active, role")
-        .eq("id", id)
-        .maybeSingle();
-
-    if (usuarioError || !usuario) {
+    if (typeof active !== "boolean") {
       return NextResponse.json(
-        { error: "Usuário não encontrado." },
-        { status: 404 }
-      );
-    }
-
-    // Impede o administrador de bloquear a própria conta
-    if (
-      usuario.email?.toLowerCase() ===
-        emailAdmin?.toLowerCase() &&
-      active === false
-    ) {
-      return NextResponse.json(
-        { error: "Você não pode bloquear sua própria conta." },
+        {
+          error: "O status do usuário é inválido.",
+        },
         { status: 400 }
       );
     }
 
     const { data, error } = await supabaseAdmin
       .from("user_access")
-      .update({ active })
+      .update({
+        active,
+      })
       .eq("id", id)
       .select("id, email, active, role")
       .single();
 
     if (error) {
       return NextResponse.json(
-        { error: "Não foi possível alterar o acesso." },
-        { status: 500 }
+        {
+          error: error.message,
+        },
+        { status: 400 }
       );
     }
 
@@ -213,7 +280,9 @@ export async function PATCH(request: Request) {
     });
   } catch {
     return NextResponse.json(
-      { error: "Erro interno ao alterar acesso." },
+      {
+        error: "Erro interno ao alterar usuário.",
+      },
       { status: 500 }
     );
   }
