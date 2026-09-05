@@ -14,78 +14,103 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     async function prepararRecuperacao() {
       try {
-        /*
-         * O Supabase envia o access_token no fragmento:
-         *
-         * /reset-password#access_token=...&refresh_token=...
-         */
+        const url = new URL(window.location.href);
+        const code = url.searchParams.get("code");
 
+        /*
+         * O Supabase pode enviar o link de recuperação
+         * usando o formato:
+         *
+         * /reset-password?code=...
+         *
+         * Nesse caso, trocamos o código pela sessão.
+         */
+        if (code) {
+          const { error } =
+            await supabase.auth.exchangeCodeForSession(code);
+
+          if (error) {
+            console.error(
+              "Erro ao trocar código pela sessão:",
+              error
+            );
+
+            setErro(
+              "Este link de acesso é inválido ou expirou. Solicite um novo link."
+            );
+
+            setCarregando(false);
+            return;
+          }
+
+          setTokenValido(true);
+          setCarregando(false);
+
+          window.history.replaceState(
+            {},
+            document.title,
+            "/reset-password"
+          );
+
+          return;
+        }
+
+        /*
+         * Também aceita o formato antigo com access_token
+         * no fragmento da URL.
+         */
         const hash = window.location.hash;
 
-        if (!hash) {
-          setErro(
-            "Este link de acesso é inválido ou expirou. Solicite um novo link."
+        if (hash) {
+          const params = new URLSearchParams(
+            hash.substring(1)
           );
-          setCarregando(false);
-          return;
+
+          const accessToken =
+            params.get("access_token");
+
+          const refreshToken =
+            params.get("refresh_token");
+
+          if (accessToken && refreshToken) {
+            const { error } =
+              await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken,
+              });
+
+            if (error) {
+              console.error(
+                "Erro ao estabelecer sessão:",
+                error
+              );
+
+              setErro(
+                "Este link de acesso é inválido ou expirou. Solicite um novo link."
+              );
+
+              setCarregando(false);
+              return;
+            }
+
+            setTokenValido(true);
+            setCarregando(false);
+
+            window.history.replaceState(
+              {},
+              document.title,
+              "/reset-password"
+            );
+
+            return;
+          }
         }
 
-        const params = new URLSearchParams(hash.substring(1));
-
-        const accessToken = params.get("access_token");
-        const refreshToken = params.get("refresh_token");
-        const type = params.get("type");
-
-        if (!accessToken || !refreshToken) {
-          setErro(
-            "Este link de acesso é inválido ou expirou. Solicite um novo link."
-          );
-          setCarregando(false);
-          return;
-        }
-
-        if (type !== "recovery" && type !== "invite") {
-          setErro(
-            "Este link não é válido para definir uma senha."
-          );
-          setCarregando(false);
-          return;
-        }
-
-        /*
-         * Cria a sessão usando os tokens recebidos no e-mail.
-         */
-        const { error } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        });
-
-        if (error) {
-          console.error(
-            "Erro ao estabelecer sessão de recuperação:",
-            error
-          );
-
-          setErro(
-            "Este link de acesso é inválido ou expirou. Solicite um novo link."
-          );
-
-          setCarregando(false);
-          return;
-        }
-
-        setTokenValido(true);
-        setCarregando(false);
-
-        /*
-         * Remove os tokens da barra de endereço
-         * depois que a sessão foi criada.
-         */
-        window.history.replaceState(
-          {},
-          document.title,
-          "/reset-password"
+        setErro(
+          "Este link de acesso é inválido ou expirou. Solicite um novo link."
         );
+
+        setCarregando(false);
       } catch (error) {
         console.error(
           "Erro ao preparar recuperação:",
@@ -110,7 +135,9 @@ export default function ResetPasswordPage() {
     setMensagem("");
 
     if (senha.length < 6) {
-      setErro("A senha deve ter pelo menos 6 caracteres.");
+      setErro(
+        "A senha deve ter pelo menos 6 caracteres."
+      );
       return;
     }
 
@@ -122,9 +149,10 @@ export default function ResetPasswordPage() {
     setCarregando(true);
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: senha,
-      });
+      const { error } =
+        await supabase.auth.updateUser({
+          password: senha,
+        });
 
       if (error) {
         console.error(
