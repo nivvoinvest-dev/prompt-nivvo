@@ -7,12 +7,15 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState("");
+  const [mensagem, setMensagem] = useState("");
   const [carregando, setCarregando] = useState(false);
+  const [recuperandoSenha, setRecuperandoSenha] = useState(false);
 
   async function entrar(event: FormEvent) {
     event.preventDefault();
 
     setErro("");
+    setMensagem("");
     setCarregando(true);
 
     const emailNormalizado = email.trim().toLowerCase();
@@ -24,10 +27,6 @@ export default function Login() {
     }
 
     try {
-      /*
-       * PRIMEIRO:
-       * faz o login no Supabase Authentication.
-       */
       const { data, error } = await supabase.auth.signInWithPassword({
         email: emailNormalizado,
         password: senha,
@@ -41,11 +40,6 @@ export default function Login() {
         return;
       }
 
-      /*
-       * SEGUNDO:
-       * verifica se esse usuário possui acesso
-       * na tabela user_access.
-       */
       const { data: acesso, error: acessoError } = await supabase
         .from("user_access")
         .select("id, email, active, role")
@@ -65,11 +59,7 @@ export default function Login() {
         return;
       }
 
-      /*
-       * Usuário autenticado, mas sem cadastro
-       * ou com acesso bloqueado.
-       */
-      if (!acesso) {
+      if (!acesso || acesso.active !== true) {
         await supabase.auth.signOut();
 
         setErro(
@@ -80,20 +70,6 @@ export default function Login() {
         return;
       }
 
-      if (acesso.active !== true) {
-        await supabase.auth.signOut();
-
-        setErro(
-          "Seu acesso não está autorizado ou está inativo."
-        );
-
-        setCarregando(false);
-        return;
-      }
-
-      /*
-       * Login autorizado.
-       */
       window.location.href = "/";
     } catch (error) {
       console.error("Erro inesperado no login:", error);
@@ -104,6 +80,74 @@ export default function Login() {
 
       setCarregando(false);
     }
+  }
+
+  async function recuperarSenha(event: FormEvent) {
+    event.preventDefault();
+
+    setErro("");
+    setMensagem("");
+
+    const emailNormalizado = email.trim().toLowerCase();
+
+    if (!emailNormalizado) {
+      setErro("Digite seu e-mail para recuperar a senha.");
+      return;
+    }
+
+    setRecuperandoSenha(true);
+
+    try {
+      /*
+       * Usa o domínio atual automaticamente.
+       *
+       * Hoje:
+       * https://prompt-nivvo.vercel.app/reset-password
+       *
+       * Futuramente:
+       * https://seu-dominio.com.br/reset-password
+       */
+      const redirectTo =
+        `${window.location.origin}/reset-password`;
+
+      const { error } =
+        await supabase.auth.resetPasswordForEmail(
+          emailNormalizado,
+          {
+            redirectTo,
+          }
+        );
+
+      if (error) {
+        console.error(
+          "Erro ao enviar recuperação de senha:",
+          error
+        );
+
+        setErro(
+          error.message ||
+            "Não foi possível enviar o e-mail de recuperação."
+        );
+
+        setRecuperandoSenha(false);
+        return;
+      }
+
+      setMensagem(
+        "Enviamos um link para redefinir sua senha. Verifique seu e-mail."
+      );
+    } catch (error) {
+      console.error(
+        "Erro inesperado na recuperação de senha:",
+        error
+      );
+
+      setErro(
+        "Não foi possível enviar o e-mail de recuperação. Tente novamente."
+      );
+    }
+
+    setRecuperandoSenha(false);
   }
 
   return (
@@ -164,15 +208,37 @@ export default function Login() {
             </div>
           )}
 
+          {mensagem && (
+            <div className="rounded-xl border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-400">
+              {mensagem}
+            </div>
+          )}
+
           <button
             type="submit"
-            disabled={carregando}
+            disabled={carregando || recuperandoSenha}
             className="w-full rounded-xl bg-blue-600 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {carregando ? "Entrando..." : "Entrar"}
           </button>
 
         </form>
+
+        <form
+          onSubmit={recuperarSenha}
+          className="mt-4"
+        >
+          <button
+            type="submit"
+            disabled={carregando || recuperandoSenha}
+            className="w-full py-2 text-sm text-blue-400 transition hover:text-blue-300 disabled:opacity-50"
+          >
+            {recuperandoSenha
+              ? "Enviando..."
+              : "Esqueci minha senha"}
+          </button>
+        </form>
+
       </div>
     </main>
   );
