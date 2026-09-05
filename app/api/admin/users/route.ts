@@ -16,6 +16,44 @@ function criarSupabaseAdmin() {
   );
 }
 
+/*
+ * Localiza um usuário no Supabase Authentication pelo e-mail.
+ */
+async function encontrarUsuarioAuth(
+  supabaseAdmin: ReturnType<typeof criarSupabaseAdmin>,
+  email: string
+) {
+  const { data, error } =
+    await supabaseAdmin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+
+  if (error) {
+    return {
+      user: null,
+      error,
+    };
+  }
+
+  const emailNormalizado = email.trim().toLowerCase();
+
+  const user =
+    data.users.find(
+      (usuario) =>
+        usuario.email?.trim().toLowerCase() ===
+        emailNormalizado
+    ) || null;
+
+  return {
+    user,
+    error: null,
+  };
+}
+
+/*
+ * Verifica se quem está fazendo a requisição é administrador.
+ */
 async function verificarAdmin(request: Request) {
   const supabaseAdmin = criarSupabaseAdmin();
 
@@ -43,8 +81,6 @@ async function verificarAdmin(request: Request) {
   } = await supabaseAdmin.auth.getUser(token);
 
   if (userError || !user?.email) {
-    console.error("Erro ao verificar usuário:", userError);
-
     return {
       autorizado: false,
       supabaseAdmin,
@@ -53,12 +89,14 @@ async function verificarAdmin(request: Request) {
 
   const emailAdmin = user.email.trim().toLowerCase();
 
-  const { data: acesso, error: acessoError } =
-    await supabaseAdmin
-      .from("user_access")
-      .select("id, email, active, role")
-      .eq("email", emailAdmin)
-      .maybeSingle();
+  const {
+    data: acesso,
+    error: acessoError,
+  } = await supabaseAdmin
+    .from("user_access")
+    .select("id, email, active, role")
+    .eq("email", emailAdmin)
+    .maybeSingle();
 
   if (
     acessoError ||
@@ -79,12 +117,17 @@ async function verificarAdmin(request: Request) {
 }
 
 /*
- * LISTAR USUÁRIOS
+ * ============================================================
+ * GET
+ * Lista os usuários autorizados.
+ * ============================================================
  */
 export async function GET(request: Request) {
   try {
-    const { autorizado, supabaseAdmin } =
-      await verificarAdmin(request);
+    const {
+      autorizado,
+      supabaseAdmin,
+    } = await verificarAdmin(request);
 
     if (!autorizado) {
       return NextResponse.json(
@@ -92,16 +135,14 @@ export async function GET(request: Request) {
           error:
             "Apenas administradores podem acessar os usuários.",
         },
-        {
-          status: 403,
-          headers: {
-            "Cache-Control": "no-store",
-          },
-        }
+        { status: 403 }
       );
     }
 
-    const { data, error } = await supabaseAdmin
+    const {
+      data,
+      error,
+    } = await supabaseAdmin
       .from("user_access")
       .select("id, email, active, role")
       .order("id", { ascending: true });
@@ -116,12 +157,7 @@ export async function GET(request: Request) {
         {
           error: error.message,
         },
-        {
-          status: 500,
-          headers: {
-            "Cache-Control": "no-store",
-          },
-        }
+        { status: 500 }
       );
     }
 
@@ -146,7 +182,8 @@ export async function GET(request: Request) {
 
     return NextResponse.json(
       {
-        error: "Erro interno ao carregar usuários.",
+        error:
+          "Erro interno ao carregar usuários.",
       },
       { status: 500 }
     );
@@ -154,12 +191,34 @@ export async function GET(request: Request) {
 }
 
 /*
- * CRIAR USUÁRIO
+ * ============================================================
+ * POST
+ * Cria/sincroniza usuário.
+ *
+ * REGRA:
+ *
+ * 1. Se não existe no Auth:
+ *      cria no Auth.
+ *
+ * 2. Se já existe no Auth:
+ *      reutiliza a conta.
+ *
+ * 3. Se existe no user_access:
+ *      NÃO tenta inserir outra linha.
+ *      Atualiza a existente.
+ *
+ * 4. Se não existe no user_access:
+ *      cria a autorização.
+ *
+ * Assim evitamos usuário órfão e erro de UNIQUE.
+ * ============================================================
  */
 export async function POST(request: Request) {
   try {
-    const { autorizado, supabaseAdmin } =
-      await verificarAdmin(request);
+    const {
+      autorizado,
+      supabaseAdmin,
+    } = await verificarAdmin(request);
 
     if (!autorizado) {
       return NextResponse.json(
@@ -186,7 +245,8 @@ export async function POST(request: Request) {
     if (!email || !password) {
       return NextResponse.json(
         {
-          error: "E-mail e senha são obrigatórios.",
+          error:
+            "E-mail e senha são obrigatórios.",
         },
         { status: 400 }
       );
@@ -203,104 +263,82 @@ export async function POST(request: Request) {
     }
 
     /*
-     * PRIMEIRO:
-     * verificar se já existe registro em user_access.
-     *
-     * Se existir, não criamos outro.
+     * ========================================================
+     * PASSO 1
+     * Verifica se já existe registro no user_access.
+     * ========================================================
      */
     const {
       data: acessoExistente,
-      error: consultaExistenteError,
+      error: acessoConsultaError,
     } = await supabaseAdmin
       .from("user_access")
       .select("id, email, active, role")
       .eq("email", email)
       .maybeSingle();
 
-    if (consultaExistenteError) {
+    if (acessoConsultaError) {
       console.error(
         "Erro ao consultar user_access:",
-        consultaExistenteError
+        acessoConsultaError
       );
 
       return NextResponse.json(
         {
           error:
-            "Não foi possível verificar o acesso desse usuário.",
+            "Não foi possível verificar o acesso do usuário.",
         },
         { status: 500 }
       );
     }
 
     /*
-     * Se já existe em user_access, precisamos verificar
-     * se também existe no Authentication.
-     *
-     * Se não existir no Authentication, tentaremos
-     * reparar o registro criando a conta.
+     * ========================================================
+     * PASSO 2
+     * Procura a conta correspondente no Authentication.
+     * ========================================================
      */
-    if (acessoExistente) {
-      console.log(
-        "Registro já existe em user_access:",
-        email
+    const {
+      user: usuarioAuth,
+      error: authBuscaError,
+    } = await encontrarUsuarioAuth(
+      supabaseAdmin,
+      email
+    );
+
+    if (authBuscaError) {
+      console.error(
+        "Erro ao procurar usuário no Authentication:",
+        authBuscaError
       );
 
+      return NextResponse.json(
+        {
+          error:
+            "Não foi possível verificar o usuário no Authentication.",
+        },
+        { status: 500 }
+      );
+    }
+
+    let usuarioFinal = usuarioAuth;
+
+    /*
+     * ========================================================
+     * PASSO 3
+     * Se não existe no Authentication, cria.
+     *
+     * IMPORTANTE:
+     * Não bloqueamos a criação só porque user_access
+     * já possui o e-mail.
+     *
+     * Isso resolve exatamente o problema atual.
+     * ========================================================
+     */
+    if (!usuarioFinal) {
       const {
-        data: authUsuarios,
-        error: authBuscaError,
-      } =
-        await supabaseAdmin.auth.admin.listUsers({
-          page: 1,
-          perPage: 1000,
-        });
-
-      if (authBuscaError) {
-        console.error(
-          "Erro ao consultar Authentication:",
-          authBuscaError
-        );
-
-        return NextResponse.json(
-          {
-            error:
-              "O acesso já existe, mas não foi possível verificar o Authentication.",
-          },
-          { status: 500 }
-        );
-      }
-
-      const usuarioAuth = authUsuarios.users.find(
-        (usuario) =>
-          usuario.email?.trim().toLowerCase() === email
-      );
-
-      /*
-       * Já existe nos dois lugares.
-       */
-      if (usuarioAuth) {
-        return NextResponse.json({
-          success: true,
-          existente: true,
-          usuario: acessoExistente,
-          message:
-            "Este usuário já está cadastrado.",
-        });
-      }
-
-      /*
-       * Existe somente em user_access.
-       *
-       * Vamos reparar o registro criando a conta
-       * no Authentication.
-       */
-      console.log(
-        "Registro órfão encontrado. Criando Authentication:",
-        email
-      );
-
-      const {
-        data: novoUsuarioOrfao,
-        error: criarOrfaoError,
+        data: novoUsuario,
+        error: criarErro,
       } =
         await supabaseAdmin.auth.admin.createUser({
           email,
@@ -308,256 +346,143 @@ export async function POST(request: Request) {
           email_confirm: true,
         });
 
-      if (
-        criarOrfaoError ||
-        !novoUsuarioOrfao.user
-      ) {
+      if (criarErro || !novoUsuario.user) {
         console.error(
-          "Erro ao reparar Authentication:",
-          criarOrfaoError
+          "Erro ao criar usuário no Authentication:",
+          criarErro
         );
 
         return NextResponse.json(
           {
             error:
-              criarOrfaoError?.message ||
+              criarErro?.message ||
               "Não foi possível criar o usuário no Authentication.",
           },
           { status: 400 }
         );
       }
 
-      /*
-       * O user_access já existe.
-       * NÃO fazemos insert novamente.
-       *
-       * Apenas garantimos que está ativo.
-       */
+      usuarioFinal = novoUsuario.user;
+    }
+
+    /*
+     * ========================================================
+     * PASSO 4
+     * Agora garantimos o user_access.
+     *
+     * Se já existe:
+     *      atualiza para ativo.
+     *
+     * Se não existe:
+     *      cria.
+     *
+     * Portanto nunca tentamos inserir uma segunda linha
+     * com o mesmo e-mail.
+     * ========================================================
+     */
+    let acessoFinal = acessoExistente;
+
+    if (acessoExistente) {
       const {
-        data: acessoReparado,
-        error: acessoReparadoError,
+        data: acessoAtualizado,
+        error: atualizarAcessoError,
       } = await supabaseAdmin
         .from("user_access")
         .update({
+          email,
           active: true,
+          role:
+            acessoExistente.role || "user",
         })
         .eq("id", acessoExistente.id)
         .select("id, email, active, role")
         .single();
 
-      if (acessoReparadoError) {
+      if (atualizarAcessoError || !acessoAtualizado) {
         console.error(
-          "Erro ao atualizar acesso reparado:",
-          acessoReparadoError
+          "Erro ao atualizar user_access:",
+          atualizarAcessoError
         );
 
-        /*
-         * Aqui NÃO apagamos o Authentication.
-         *
-         * O usuário Auth foi criado corretamente.
-         * Se houver algum problema no acesso, ele será
-         * tratado sem destruir a conta.
-         */
         return NextResponse.json(
           {
             error:
-              "A conta foi criada no Authentication, mas houve um problema ao atualizar o acesso.",
+              atualizarAcessoError?.message ||
+              "Não foi possível atualizar o acesso do usuário.",
           },
           { status: 500 }
         );
       }
 
-      return NextResponse.json(
-        {
-          success: true,
-          reparado: true,
-          usuario: acessoReparado,
-          message:
-            "Usuário sincronizado com sucesso.",
-        },
-        { status: 201 }
-      );
-    }
+      acessoFinal = acessoAtualizado;
+    } else {
+      const {
+        data: novoAcesso,
+        error: criarAcessoError,
+      } = await supabaseAdmin
+        .from("user_access")
+        .insert({
+          email,
+          active: true,
+          role: "user",
+        })
+        .select("id, email, active, role")
+        .single();
 
-    /*
-     * NÃO existe em user_access.
-     *
-     * Agora criamos no Authentication.
-     */
-    console.log(
-      "Criando novo usuário no Authentication:",
-      email
-    );
+      if (criarAcessoError || !novoAcesso) {
+        console.error(
+          "Erro ao criar user_access:",
+          criarAcessoError
+        );
 
-    const {
-      data: novoUsuario,
-      error: criarErro,
-    } =
-      await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-      });
-
-    if (criarErro || !novoUsuario.user) {
-      console.error(
-        "Erro ao criar usuário no Authentication:",
-        criarErro
-      );
-
-      const mensagem =
-        criarErro?.message?.toLowerCase() || "";
-
-      /*
-       * Caso exista no Auth, mas não exista em
-       * user_access, tentamos sincronizar.
-       */
-      if (
-        mensagem.includes("already") ||
-        mensagem.includes("exists") ||
-        mensagem.includes("registered")
-      ) {
-        const {
-          data: acessoDepoisDoConflito,
-          error: acessoDepoisError,
-        } = await supabaseAdmin
-          .from("user_access")
-          .select("id, email, active, role")
-          .eq("email", email)
-          .maybeSingle();
-
-        if (
-          !acessoDepoisError &&
-          acessoDepoisDoConflito
-        ) {
-          return NextResponse.json({
-            success: true,
-            existente: true,
-            usuario: acessoDepoisDoConflito,
-            message:
-              "Este usuário já estava cadastrado.",
-          });
+        /*
+         * Se acabamos de criar o Auth e falhou a criação
+         * do acesso, removemos a conta recém-criada.
+         *
+         * Isso evita deixar uma conta Auth sem autorização.
+         */
+        if (!usuarioAuth && usuarioFinal?.id) {
+          await supabaseAdmin.auth.admin.deleteUser(
+            usuarioFinal.id
+          );
         }
 
         return NextResponse.json(
           {
             error:
-              "Este e-mail já possui uma conta no Authentication.",
+              criarAcessoError?.message ||
+              "Não foi possível criar o acesso do usuário.",
           },
-          { status: 409 }
+          { status: 500 }
         );
       }
 
-      return NextResponse.json(
-        {
-          error:
-            criarErro?.message ||
-            "Não foi possível criar o usuário no Authentication.",
-        },
-        { status: 400 }
-      );
+      acessoFinal = novoAcesso;
     }
 
     /*
-     * Authentication criado.
-     *
-     * Agora criamos user_access.
+     * ========================================================
+     * SUCESSO
+     * ========================================================
      */
-    const {
-      data: novoAcesso,
-      error: novoAcessoError,
-    } = await supabaseAdmin
-      .from("user_access")
-      .insert({
-        email,
-        active: true,
-        role: "user",
-      })
-      .select("id, email, active, role")
-      .single();
-
-    if (novoAcessoError || !novoAcesso) {
-      console.error(
-        "Erro ao criar user_access:",
-        novoAcessoError
-      );
-
-      /*
-       * 23505 = e-mail já existe em user_access.
-       *
-       * IMPORTANTE:
-       * NÃO apagamos o usuário do Authentication.
-       *
-       * Em vez disso, buscamos o registro existente
-       * e consideramos o cadastro sincronizado.
-       */
-      if (novoAcessoError?.code === "23505") {
-        const {
-          data: acessoExistenteDepois,
-          error: acessoDepoisError,
-        } = await supabaseAdmin
-          .from("user_access")
-          .select("id, email, active, role")
-          .eq("email", email)
-          .maybeSingle();
-
-        if (
-          !acessoDepoisError &&
-          acessoExistenteDepois
-        ) {
-          console.log(
-            "Conflito 23505 tratado sem apagar Authentication:",
-            email
-          );
-
-          return NextResponse.json({
-            success: true,
-            sincronizado: true,
-            usuario: acessoExistenteDepois,
-            message:
-              "Usuário já estava cadastrado e foi sincronizado.",
-          });
-        }
-      }
-
-      /*
-       * Não apagamos Authentication aqui.
-       *
-       * Isso é proposital.
-       * A conta Auth deve permanecer para evitar
-       * exatamente o problema que tivemos antes.
-       */
-      return NextResponse.json(
-        {
-          error:
-            novoAcessoError?.message ||
-            "A conta foi criada no Authentication, mas não foi possível criar o acesso.",
-        },
-        { status: 500 }
-      );
-    }
-
-    console.log(
-      "Usuário criado e sincronizado:",
-      email
-    );
-
     return NextResponse.json(
       {
         success: true,
-        usuario: novoAcesso,
+        usuario: acessoFinal,
+        auth_user_id: usuarioFinal.id,
       },
       { status: 201 }
     );
   } catch (error) {
     console.error(
-      "Erro interno ao criar usuário:",
+      "Erro interno ao criar/sincronizar usuário:",
       error
     );
 
     return NextResponse.json(
       {
-        error: "Erro interno ao criar usuário.",
+        error:
+          "Erro interno ao criar usuário.",
       },
       { status: 500 }
     );
@@ -565,12 +490,17 @@ export async function POST(request: Request) {
 }
 
 /*
- * ALTERAR STATUS DO USUÁRIO
+ * ============================================================
+ * PATCH
+ * Ativa / bloqueia acesso.
+ * ============================================================
  */
 export async function PATCH(request: Request) {
   try {
-    const { autorizado, supabaseAdmin } =
-      await verificarAdmin(request);
+    const {
+      autorizado,
+      supabaseAdmin,
+    } = await verificarAdmin(request);
 
     if (!autorizado) {
       return NextResponse.json(
@@ -590,7 +520,8 @@ export async function PATCH(request: Request) {
     if (!id) {
       return NextResponse.json(
         {
-          error: "ID do usuário é obrigatório.",
+          error:
+            "ID do usuário é obrigatório.",
         },
         { status: 400 }
       );
@@ -599,7 +530,8 @@ export async function PATCH(request: Request) {
     if (typeof active !== "boolean") {
       return NextResponse.json(
         {
-          error: "O status do usuário é inválido.",
+          error:
+            "O status do usuário é inválido.",
         },
         { status: 400 }
       );
@@ -643,7 +575,8 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json(
       {
-        error: "Erro interno ao alterar usuário.",
+        error:
+          "Erro interno ao alterar usuário.",
       },
       { status: 500 }
     );
