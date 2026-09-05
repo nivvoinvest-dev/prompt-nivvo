@@ -4,7 +4,13 @@ import { createClient } from "@supabase/supabase-js";
 function criarSupabaseAdmin() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
   );
 }
 
@@ -34,12 +40,16 @@ async function verificarAdmin(request: Request) {
     };
   }
 
-  const { data: acesso, error: acessoError } =
-    await supabaseAdmin
-      .from("user_access")
-      .select("id, email, active, role")
-      .eq("email", user.email)
-      .maybeSingle();
+  const emailAdmin = user.email.trim().toLowerCase();
+
+  const {
+    data: acesso,
+    error: acessoError,
+  } = await supabaseAdmin
+    .from("user_access")
+    .select("id, email, active, role")
+    .eq("email", emailAdmin)
+    .maybeSingle();
 
   if (
     acessoError ||
@@ -83,6 +93,11 @@ export async function GET(request: Request) {
       .order("id", { ascending: true });
 
     if (error) {
+      console.error(
+        "Erro ao listar usuários:",
+        error
+      );
+
       return NextResponse.json(
         {
           error: error.message,
@@ -94,7 +109,12 @@ export async function GET(request: Request) {
     return NextResponse.json({
       usuarios: data || [],
     });
-  } catch {
+  } catch (error) {
+    console.error(
+      "Erro interno ao carregar usuários:",
+      error
+    );
+
     return NextResponse.json(
       {
         error: "Erro interno ao carregar usuários.",
@@ -122,12 +142,31 @@ export async function POST(request: Request) {
       );
     }
 
-    const { email, password } = await request.json();
+    const body = await request.json();
 
-    if (!email || !password) {
+    const email = body?.email;
+    const password = body?.password;
+
+    if (
+      typeof email !== "string" ||
+      typeof password !== "string"
+    ) {
       return NextResponse.json(
         {
           error: "E-mail e senha são obrigatórios.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const emailNormalizado = email
+      .trim()
+      .toLowerCase();
+
+    if (!emailNormalizado) {
+      return NextResponse.json(
+        {
+          error: "Informe um e-mail válido.",
         },
         { status: 400 }
       );
@@ -143,14 +182,33 @@ export async function POST(request: Request) {
       );
     }
 
-    const emailNormalizado = email.trim().toLowerCase();
+    /*
+     * PRIMEIRA PROTEÇÃO:
+     * verificar se já existe acesso na tabela.
+     */
+    const {
+      data: acessoExistente,
+      error: consultaExistenteError,
+    } = await supabaseAdmin
+      .from("user_access")
+      .select("id, email, active, role")
+      .eq("email", emailNormalizado)
+      .maybeSingle();
 
-    const { data: acessoExistente } =
-      await supabaseAdmin
-        .from("user_access")
-        .select("id, email, active, role")
-        .eq("email", emailNormalizado)
-        .maybeSingle();
+    if (consultaExistenteError) {
+      console.error(
+        "Erro ao verificar usuário existente:",
+        consultaExistenteError
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "Não foi possível verificar se o usuário já existe.",
+        },
+        { status: 500 }
+      );
+    }
 
     if (acessoExistente) {
       return NextResponse.json(
@@ -158,18 +216,53 @@ export async function POST(request: Request) {
           error:
             "Este e-mail já possui acesso cadastrado.",
         },
-        { status: 400 }
+        { status: 409 }
       );
     }
 
-    const { data: novoUsuario, error: criarErro } =
-      await supabaseAdmin.auth.admin.createUser({
-        email: emailNormalizado,
-        password,
-        email_confirm: true,
-      });
+    /*
+     * SEGUNDA PROTEÇÃO:
+     * criar o usuário no Supabase Auth.
+     *
+     * O Supabase Auth já impede duas contas com
+     * o mesmo e-mail.
+     */
+    const {
+      data: novoUsuario,
+      error: criarErro,
+    } = await supabaseAdmin.auth.admin.createUser({
+      email: emailNormalizado,
+      password,
+      email_confirm: true,
+    });
 
     if (criarErro || !novoUsuario.user) {
+      console.error(
+        "Erro ao criar usuário no Auth:",
+        criarErro
+      );
+
+      /*
+       * Se a conta já existe no Auth, informamos
+       * claramente ao administrador.
+       */
+      const mensagem =
+        criarErro?.message?.toLowerCase() || "";
+
+      if (
+        mensagem.includes("already") ||
+        mensagem.includes("exists") ||
+        mensagem.includes("registered")
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Este e-mail já possui uma conta cadastrada. Verifique a lista de usuários.",
+          },
+          { status: 409 }
+        );
+      }
+
       return NextResponse.json(
         {
           error:
@@ -180,35 +273,74 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: acesso, error: acessoError } =
-      await supabaseAdmin
-        .from("user_access")
-        .insert({
-          email: emailNormalizado,
-          active: true,
-          role: "user",
-        })
-        .select("id, email, active, role")
-        .single();
+    /*
+     * CRIAR REGISTRO DE ACESSO
+     */
+    const {
+      data: acesso,
+      error: acessoError,
+    } = await supabaseAdmin
+      .from("user_access")
+      .insert({
+        email: emailNormalizado,
+        active: true,
+        role: "user",
+      })
+      .select("id, email, active, role")
+      .single();
 
-    if (acessoError) {
+    /*
+     * Se falhar a criação do acesso,
+     * apagamos a conta criada no Auth para
+     * não deixar usuário órfão.
+     */
+    if (acessoError || !acesso) {
+      console.error(
+        "Erro ao criar acesso:",
+        acessoError
+      );
+
       await supabaseAdmin.auth.admin.deleteUser(
         novoUsuario.user.id
       );
 
+      /*
+       * 23505 = violação de chave única.
+       * Isso protege contra duas requisições simultâneas.
+       */
+      if (acessoError?.code === "23505") {
+        return NextResponse.json(
+          {
+            error:
+              "Este e-mail já possui acesso cadastrado.",
+          },
+          { status: 409 }
+        );
+      }
+
       return NextResponse.json(
         {
-          error: acessoError.message,
+          error:
+            acessoError?.message ||
+            "Não foi possível criar o acesso do usuário.",
         },
         { status: 400 }
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      usuario: acesso,
-    });
-  } catch {
+    return NextResponse.json(
+      {
+        success: true,
+        usuario: acesso,
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error(
+      "Erro interno ao criar usuário:",
+      error
+    );
+
     return NextResponse.json(
       {
         error: "Erro interno ao criar usuário.",
@@ -256,7 +388,10 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const { data, error } = await supabaseAdmin
+    const {
+      data,
+      error,
+    } = await supabaseAdmin
       .from("user_access")
       .update({
         active,
@@ -266,6 +401,11 @@ export async function PATCH(request: Request) {
       .single();
 
     if (error) {
+      console.error(
+        "Erro ao alterar usuário:",
+        error
+      );
+
       return NextResponse.json(
         {
           error: error.message,
@@ -278,7 +418,12 @@ export async function PATCH(request: Request) {
       success: true,
       usuario: data,
     });
-  } catch {
+  } catch (error) {
+    console.error(
+      "Erro interno ao alterar usuário:",
+      error
+    );
+
     return NextResponse.json(
       {
         error: "Erro interno ao alterar usuário.",
