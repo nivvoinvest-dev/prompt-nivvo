@@ -570,98 +570,110 @@ function toggleFavorite(promptId: number) {
 
 
           return (
-  <article
-    key={prompt.id}
-    className="group relative overflow-hidden rounded-2xl border border-white/10 bg-transparent shadow-lg shadow-black/20 transition-all duration-300 hover:-translate-y-1.5 hover:border-blue-500/50 hover:shadow-2xl hover:shadow-blue-500/10"
-  >
-    <div className="relative aspect-[9/16] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-blue-950/40 via-[#10131a] to-[#07090d]">
+            <article
+              key={prompt.id}
+              className="group relative overflow-hidden rounded-2xl border border-white/10 bg-transparent shadow-lg shadow-black/20 transition-all duration-300 hover:-translate-y-1.5 hover:border-blue-500/50 hover:shadow-2xl hover:shadow-blue-500/10"
+            >
+              <div className="relative aspect-[9/16] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-blue-950/40 via-[#10131a] to-[#07090d]">
 
-      {prompt.video_url ? (
-        <video
-          src={prompt.video_url}
-          autoPlay
-          loop
-          muted
-          playsInline
-          preload="auto"
-          className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-105"
-        />
-      ) : prompt.image_url ? (
-        <img
-          src={prompt.image_url}
-          alt={prompt.title}
-          className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-105"
-        />
-      ) : (
-        <div className="absolute inset-0 flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-950 via-[#101827] to-black">
-          <span className="text-4xl font-bold text-blue-400">
-            {prompt.title.charAt(0).toUpperCase()}
-          </span>
-        </div>
-      )}
+                {prompt.video_url ? (
+                  <video
+                    src={prompt.video_url}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    preload="auto"
+                    className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-105"
+                  />
+                ) : prompt.image_url ? (
+                  <img
+                    src={prompt.image_url}
+                    alt={prompt.title}
+                    className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-105"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-950 via-[#101827] to-black">
+                    <span className="text-4xl font-bold text-blue-400">
+                      {prompt.title.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )}
 
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
 
-      <div className="absolute left-3 top-3 z-20 flex items-center gap-2">
-        <span className="rounded-lg border border-blue-500/20 bg-black/70 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-blue-400 backdrop-blur">
-          {prompt.type}
-        </span>
+                <div className="absolute left-3 top-3 z-20 flex items-center gap-2">
+                  <span className="rounded-lg border border-blue-500/20 bg-black/70 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-blue-400 backdrop-blur">
+                    {prompt.type}
+                  </span>
 
-        <span className="rounded-lg border border-white/10 bg-black/70 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/80 backdrop-blur">
-          {prompt.media_type === "both"
-            ? "🎥 Vídeo + 🖼️ Imagem"
-            : prompt.media_type === "video"
-            ? "🎥 Vídeo"
-            : "🖼️ Imagem"}
-        </span>
-      </div>
+                  <span className="rounded-lg border border-white/10 bg-black/70 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/80 backdrop-blur">
+                    {prompt.media_type === "both"
+                      ? "🎥 Vídeo + 🖼️ Imagem"
+                      : prompt.media_type === "video"
+                        ? "🎥 Vídeo"
+                        : "🖼️ Imagem"}
+                  </span>
+                </div>
 
-      <button
-        onClick={() => toggleFavorite(prompt.id)}
-        className={`absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full border text-lg backdrop-blur transition-all duration-200 ${
-          favorites.includes(prompt.id)
-            ? "scale-110 border-red-500/50 bg-red-500/20 text-red-400"
-            : "border-white/10 bg-black/60 text-white hover:scale-105 hover:border-red-500/40 hover:text-red-400"
-        }`}
-      >
-        {favorites.includes(prompt.id) ? "♥" : "♡"}
-      </button>
+                <button
+                  onClick={() => toggleFavorite(prompt.id)}
+                  className={`absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full border text-lg backdrop-blur transition-all duration-200 ${
+                    favorites.includes(prompt.id)
+                      ? "scale-110 border-red-500/50 bg-red-500/20 text-red-400"
+                      : "border-white/10 bg-black/60 text-white hover:scale-105 hover:border-red-500/40 hover:text-red-400"
+                  }`}
+                >
+                  {favorites.includes(prompt.id) ? "♥" : "♡"}
+                </button>
 
-      <div className="absolute inset-x-0 bottom-0 z-10 p-5 pt-28">
+                <div className="absolute inset-x-0 bottom-0 z-10 p-5 pt-28">
 
-        <h4 className="line-clamp-2 text-base font-semibold leading-6 tracking-tight text-white drop-shadow-lg">
-          {prompt.title}
-        </h4>
+                  <h4 className="line-clamp-2 text-base font-semibold leading-6 tracking-tight text-white drop-shadow-lg">
+                    {prompt.title}
+                  </h4>
 
-        <p className="mt-2 line-clamp-3 text-sm leading-6 text-gray-300 drop-shadow-lg">
-          {prompt.description}
-        </p>
+                  <p className="mt-2 line-clamp-3 text-sm leading-6 text-gray-300 drop-shadow-lg">
+                    {prompt.description}
+                  </p>
 
-        <div className="mt-4 flex items-center justify-end">
+                  <div className="mt-4 flex items-center justify-between">
 
-          <button
-            onClick={() => copyPrompt(prompt)}
-            className={`rounded-xl border border-white/10 px-4 py-2.5 text-xs font-semibold text-white shadow-lg backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 ${
-              copiedId === prompt.id
-                ? "bg-green-500/75 shadow-green-500/20"
-                : "bg-blue-600/65 shadow-blue-500/20 hover:bg-blue-500/80 hover:shadow-blue-500/30"
-            }`}
-          >
-            {copiedId === prompt.id
-              ? "✓ Copiado!"
-              : "Copiar novamente"}
-          </button>
+                    <span className="text-xs font-medium text-white/70 drop-shadow-lg">
+                      {prompt.id}
+                    </span>
 
-        </div>
-      </div>
-    </div>
-  </article>
-);
+                    <button
+                      onClick={() => copyPrompt(prompt)}
+                      className={`rounded-xl border border-white/10 px-4 py-2.5 text-xs font-semibold text-white shadow-lg backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 ${
+                        copiedId === prompt.id
+                          ? "bg-green-500/75 shadow-green-500/20"
+                          : "bg-blue-600/65 shadow-blue-500/20 hover:bg-blue-500/80 hover:shadow-blue-500/30"
+                      }`}
+                    >
+                      {copiedId === prompt.id ? "✓ Copiado!" : "Copy Prompt"}
+                    </button>
+
+                  </div>
+                </div>
+
+              </div>
+            </article>
+          )
+
+
         })}
+
+
       </div>
+
+
     )}
+
+
   </section>
 )}
+
 
 {activePage === "hub-boss" && (
   <>
