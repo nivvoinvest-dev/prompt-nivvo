@@ -120,39 +120,42 @@ export async function POST(request: Request) {
        */
 
       if (!usuarioExistente) {
-        const senhaTemporaria =
-          `${crypto.randomUUID()}Aa1!`;
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    "https://prompt-nivvo.vercel.app";
 
-        const {
-          data: novoUsuario,
-          error: criarUsuarioError,
-        } = await supabaseAdmin.auth.admin.createUser({
-          email,
-          password: senhaTemporaria,
-          email_confirm: true,
-        });
-
-        if (criarUsuarioError || !novoUsuario.user) {
-          console.error(
-            "Erro ao criar usuário no Authentication:",
-            criarUsuarioError
-          );
-
-          return NextResponse.json(
-            {
-              success: false,
-              error:
-                criarUsuarioError?.message ||
-                "Não foi possível criar o usuário.",
-            },
-            { status: 500 }
-          );
-        }
-
-        console.log(
-          `Usuário criado no Authentication: ${email}`
-        );
+  const {
+    data: convite,
+    error: conviteError,
+  } =
+    await supabaseAdmin.auth.admin.inviteUserByEmail(
+      email,
+      {
+        redirectTo: `${siteUrl}/reset-password`,
       }
+    );
+
+  if (conviteError || !convite.user) {
+    console.error(
+      "Erro ao enviar convite para o usuário:",
+      conviteError
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          conviteError?.message ||
+          "Não foi possível enviar o convite ao usuário.",
+      },
+      { status: 500 }
+    );
+  }
+
+  console.log(
+    `Usuário criado e convite enviado pela Cakto: ${email}`
+  );
+}
 
       /*
        * 3. Ativar o acesso.
