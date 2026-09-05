@@ -1,8 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
+import {
+  FormEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "../lib/supabase";
 
 type Usuario = {
   id: number;
@@ -14,7 +19,10 @@ type Usuario = {
 export default function Admin() {
   const router = useRouter();
 
-  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [usuarios, setUsuarios] = useState<Usuario[]>(
+    []
+  );
+
   const [busca, setBusca] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
@@ -24,34 +32,26 @@ export default function Admin() {
   const [criando, setCriando] = useState(false);
   const [mensagem, setMensagem] = useState("");
 
-  async function obterToken() {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+  /*
+   * Proteção adicional contra duplo clique.
+   *
+   * Mesmo que o React ainda não tenha atualizado
+   * o estado "criando", o ref já bloqueia uma segunda
+   * requisição.
+   */
+  const criandoRef = useRef(false);
 
-    if (!session?.access_token) {
-      return null;
-    }
-
-    return session.access_token;
-  }
-
-  async function carregarUsuarios() {
+  async function carregarUsuarios(
+    accessToken: string
+  ) {
     try {
-      const token = await obterToken();
-
-      if (!token) {
-        router.replace("/login");
-        return;
-      }
-
       const resposta = await fetch(
         `/api/admin/users?t=${Date.now()}`,
         {
           method: "GET",
           cache: "no-store",
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${accessToken}`,
             "Cache-Control": "no-cache",
           },
         }
@@ -64,67 +64,110 @@ export default function Admin() {
           resultado.error ||
             "Não foi possível carregar os usuários."
         );
-        return;
+        return false;
       }
 
       setUsuarios(resultado.usuarios || []);
+      return true;
     } catch (error) {
-      console.error(error);
+      console.error(
+        "Erro ao carregar usuários:",
+        error
+      );
 
       setErro(
-        "Não foi possível carregar os usuários."
+        "Erro ao conectar com o servidor."
       );
-    } finally {
-      setCarregando(false);
+
+      return false;
     }
   }
 
   useEffect(() => {
-    async function verificarAdmin() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+    let ativo = true;
 
-      if (!user) {
-        router.replace("/login");
-        return;
+    async function iniciar() {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!ativo) return;
+
+        if (!user) {
+          router.replace("/login");
+          return;
+        }
+
+        const emailUsuario = user.email
+          ?.trim()
+          .toLowerCase();
+
+        if (!emailUsuario) {
+          router.replace("/login");
+          return;
+        }
+
+        const {
+          data: acesso,
+          error: acessoError,
+        } = await supabase
+          .from("user_access")
+          .select(
+            "id, email, active, role"
+          )
+          .eq("email", emailUsuario)
+          .maybeSingle();
+
+        if (!ativo) return;
+
+        if (
+          acessoError ||
+          !acesso ||
+          acesso.active !== true ||
+          acesso.role !== "admin"
+        ) {
+          router.replace("/");
+          return;
+        }
+
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!ativo) return;
+
+        if (!session?.access_token) {
+          router.replace("/login");
+          return;
+        }
+
+        await carregarUsuarios(
+          session.access_token
+        );
+      } catch (error) {
+        console.error(
+          "Erro ao iniciar administração:",
+          error
+        );
+
+        if (ativo) {
+          setErro(
+            "Não foi possível carregar a administração."
+          );
+        }
+      } finally {
+        if (ativo) {
+          setCarregando(false);
+        }
       }
-
-      const emailAdmin = user.email
-        ?.trim()
-        .toLowerCase();
-
-      if (!emailAdmin) {
-        router.replace("/login");
-        return;
-      }
-
-      const {
-        data: acesso,
-        error,
-      } = await supabase
-        .from("user_access")
-        .select(
-          "id, email, active, role"
-        )
-        .eq("email", emailAdmin)
-        .limit(1)
-        .maybeSingle();
-
-      if (
-        error ||
-        !acesso ||
-        acesso.active !== true ||
-        acesso.role !== "admin"
-      ) {
-        router.replace("/");
-        return;
-      }
-
-      await carregarUsuarios();
     }
 
-    verificarAdmin();
+    iniciar();
+
+    return () => {
+      ativo = false;
+    };
   }, [router]);
 
   async function alterarAcesso(
@@ -132,12 +175,15 @@ export default function Admin() {
     ativoAtual: boolean
   ) {
     try {
-      const token = await obterToken();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-      if (!token) {
+      if (!session?.access_token) {
         alert(
           "Sua sessão expirou. Faça login novamente."
         );
+
         router.replace("/login");
         return;
       }
@@ -148,7 +194,7 @@ export default function Admin() {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
             id,
@@ -179,7 +225,10 @@ export default function Admin() {
         )
       );
     } catch (error) {
-      console.error(error);
+      console.error(
+        "Erro ao alterar acesso:",
+        error
+      );
 
       alert(
         "Erro ao conectar com o servidor."
@@ -188,9 +237,16 @@ export default function Admin() {
   }
 
   async function criarUsuario(
-    e: React.FormEvent
+    event: FormEvent<HTMLFormElement>
   ) {
-    e.preventDefault();
+    event.preventDefault();
+
+    /*
+     * Impede duas requisições simultâneas.
+     */
+    if (criandoRef.current) {
+      return;
+    }
 
     setErro("");
     setMensagem("");
@@ -213,15 +269,19 @@ export default function Admin() {
       return;
     }
 
+    criandoRef.current = true;
     setCriando(true);
 
     try {
-      const token = await obterToken();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-      if (!token) {
+      if (!session?.access_token) {
         setErro(
           "Sua sessão expirou. Faça login novamente."
         );
+
         router.replace("/login");
         return;
       }
@@ -232,7 +292,7 @@ export default function Admin() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
             email: emailNormalizado,
@@ -252,39 +312,27 @@ export default function Admin() {
       }
 
       /*
-       * Coloca o usuário retornado pela API
-       * imediatamente na lista.
+       * O backend pode retornar:
        *
-       * Isso evita depender de cache ou de
-       * uma segunda requisição para atualizar a tela.
+       * success
+       * existente
+       * reparado
+       * sincronizado
+       *
+       * Em todos esses casos o usuário está
+       * corretamente tratado pelo backend.
        */
-      if (resultado.usuario) {
-        setUsuarios((lista) => {
-          const existe = lista.some(
-            (usuario) =>
-              usuario.id ===
-              resultado.usuario.id
-          );
-
-          if (existe) {
-            return lista.map((usuario) =>
-              usuario.id ===
-              resultado.usuario.id
-                ? resultado.usuario
-                : usuario
-            );
-          }
-
-          return [
-            ...lista,
-            resultado.usuario,
-          ];
-        });
-      }
-
       if (resultado.reparado) {
         setMensagem(
-          "Usuário sincronizado e acesso liberado com sucesso."
+          "Usuário sincronizado com sucesso."
+        );
+      } else if (resultado.existente) {
+        setMensagem(
+          "Esse usuário já estava cadastrado."
+        );
+      } else if (resultado.sincronizado) {
+        setMensagem(
+          "Usuário sincronizado com sucesso."
         );
       } else {
         setMensagem(
@@ -294,23 +342,34 @@ export default function Admin() {
 
       setEmail("");
       setSenha("");
+
+      /*
+       * Atualiza imediatamente a lista do painel.
+       */
+      await carregarUsuarios(
+        session.access_token
+      );
     } catch (error) {
-      console.error(error);
+      console.error(
+        "Erro ao criar usuário:",
+        error
+      );
 
       setErro(
         "Erro ao conectar com o servidor."
       );
     } finally {
+      criandoRef.current = false;
       setCriando(false);
     }
   }
 
-  const usuariosFiltrados =
-    usuarios.filter((usuario) =>
+  const usuariosFiltrados = usuarios.filter(
+    (usuario) =>
       (usuario.email || "")
         .toLowerCase()
         .includes(busca.toLowerCase())
-    );
+  );
 
   if (carregando) {
     return (
@@ -323,7 +382,6 @@ export default function Admin() {
   return (
     <main className="min-h-screen bg-[#07090d] p-8 text-white">
       <div className="mx-auto max-w-5xl">
-
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">
@@ -343,6 +401,8 @@ export default function Admin() {
           </button>
         </div>
 
+        {/* CRIAR USUÁRIO */}
+
         <div className="mb-8 rounded-xl border border-gray-800 bg-[#0b0e13] p-6">
           <h2 className="mb-4 text-xl font-semibold">
             Criar novo usuário
@@ -359,7 +419,9 @@ export default function Admin() {
               onChange={(e) =>
                 setEmail(e.target.value)
               }
-              className="rounded-lg border border-gray-700 bg-[#07090d] px-4 py-3 text-white outline-none focus:border-blue-500"
+              disabled={criando}
+              required
+              className="rounded-lg border border-gray-700 bg-[#07090d] px-4 py-3 text-white outline-none focus:border-blue-500 disabled:opacity-50"
             />
 
             <input
@@ -369,7 +431,10 @@ export default function Admin() {
               onChange={(e) =>
                 setSenha(e.target.value)
               }
-              className="rounded-lg border border-gray-700 bg-[#07090d] px-4 py-3 text-white outline-none focus:border-blue-500"
+              disabled={criando}
+              required
+              minLength={6}
+              className="rounded-lg border border-gray-700 bg-[#07090d] px-4 py-3 text-white outline-none focus:border-blue-500 disabled:opacity-50"
             />
 
             <button
@@ -396,6 +461,8 @@ export default function Admin() {
           )}
         </div>
 
+        {/* BUSCAR USUÁRIO */}
+
         <div className="mb-4">
           <input
             type="text"
@@ -408,8 +475,9 @@ export default function Admin() {
           />
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-gray-800">
+        {/* LISTA DE USUÁRIOS */}
 
+        <div className="overflow-hidden rounded-xl border border-gray-800">
           <div className="grid grid-cols-4 bg-gray-900 p-4 font-semibold">
             <div>E-mail</div>
             <div>Status</div>
@@ -460,14 +528,14 @@ export default function Admin() {
             </div>
           ))}
 
-          {usuariosFiltrados.length === 0 && (
-            <div className="p-6 text-center text-gray-400">
-              {busca
-                ? "Nenhum usuário encontrado para essa busca."
-                : "Nenhum usuário encontrado."}
-            </div>
-          )}
-
+          {usuariosFiltrados.length === 0 &&
+            !erro && (
+              <div className="p-6 text-center text-gray-400">
+                {busca
+                  ? "Nenhum usuário encontrado para essa busca."
+                  : "Nenhum usuário encontrado."}
+              </div>
+            )}
         </div>
       </div>
     </main>
