@@ -24,73 +24,104 @@ export default function Admin() {
   const [criando, setCriando] = useState(false);
   const [mensagem, setMensagem] = useState("");
 
+  async function obterToken() {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      return null;
+    }
+
+    return session.access_token;
+  }
+
+  async function carregarUsuarios() {
+    try {
+      const token = await obterToken();
+
+      if (!token) {
+        router.replace("/login");
+        return;
+      }
+
+      const resposta = await fetch(
+        `/api/admin/users?t=${Date.now()}`,
+        {
+          method: "GET",
+          cache: "no-store",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Cache-Control": "no-cache",
+          },
+        }
+      );
+
+      const resultado = await resposta.json();
+
+      if (!resposta.ok) {
+        setErro(
+          resultado.error ||
+            "Não foi possível carregar os usuários."
+        );
+        return;
+      }
+
+      setUsuarios(resultado.usuarios || []);
+    } catch (error) {
+      console.error(error);
+
+      setErro(
+        "Não foi possível carregar os usuários."
+      );
+    } finally {
+      setCarregando(false);
+    }
+  }
+
   useEffect(() => {
     async function verificarAdmin() {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-        if (!user) {
-          router.replace("/login");
-          return;
-        }
-
-        const { data: acesso, error } = await supabase
-          .from("user_access")
-          .select("id, email, active, role")
-          .eq("email", user.email)
-          .maybeSingle();
-
-        if (
-          error ||
-          !acesso ||
-          acesso.active !== true ||
-          acesso.role !== "admin"
-        ) {
-          router.replace("/");
-          return;
-        }
-
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (!session?.access_token) {
-          router.replace("/login");
-          return;
-        }
-
-        const resposta = await fetch(
-          `/api/admin/users?t=${Date.now()}`,
-          {
-            method: "GET",
-            cache: "no-store",
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-              "Cache-Control": "no-cache",
-            },
-          }
-        );
-
-        const resultado = await resposta.json();
-
-        if (!resposta.ok) {
-          setErro(
-            resultado.error ||
-              "Não foi possível carregar os usuários."
-          );
-        } else {
-          setUsuarios(resultado.usuarios || []);
-        }
-
-        setCarregando(false);
-      } catch {
-        setErro(
-          "Não foi possível verificar seu acesso. Tente novamente."
-        );
-        setCarregando(false);
+      if (!user) {
+        router.replace("/login");
+        return;
       }
+
+      const emailAdmin = user.email
+        ?.trim()
+        .toLowerCase();
+
+      if (!emailAdmin) {
+        router.replace("/login");
+        return;
+      }
+
+      const {
+        data: acesso,
+        error,
+      } = await supabase
+        .from("user_access")
+        .select(
+          "id, email, active, role"
+        )
+        .eq("email", emailAdmin)
+        .limit(1)
+        .maybeSingle();
+
+      if (
+        error ||
+        !acesso ||
+        acesso.active !== true ||
+        acesso.role !== "admin"
+      ) {
+        router.replace("/");
+        return;
+      }
+
+      await carregarUsuarios();
     }
 
     verificarAdmin();
@@ -101,24 +132,23 @@ export default function Admin() {
     ativoAtual: boolean
   ) {
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const token = await obterToken();
 
-      if (!session?.access_token) {
-        alert("Sua sessão expirou. Faça login novamente.");
+      if (!token) {
+        alert(
+          "Sua sessão expirou. Faça login novamente."
+        );
         router.replace("/login");
         return;
       }
 
       const resposta = await fetch(
-        `/api/admin/users?t=${Date.now()}`,
+        "/api/admin/users",
         {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-            "Cache-Control": "no-cache",
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             id,
@@ -142,30 +172,37 @@ export default function Admin() {
           usuario.id === id
             ? {
                 ...usuario,
-                active: resultado.usuario.active,
+                active:
+                  resultado.usuario.active,
               }
             : usuario
         )
       );
-    } catch {
-      alert("Erro ao conectar com o servidor.");
+    } catch (error) {
+      console.error(error);
+
+      alert(
+        "Erro ao conectar com o servidor."
+      );
     }
   }
 
-  async function criarUsuario(e: React.FormEvent) {
+  async function criarUsuario(
+    e: React.FormEvent
+  ) {
     e.preventDefault();
-
-    if (criando) {
-      return;
-    }
 
     setErro("");
     setMensagem("");
 
-    const emailNormalizado = email.trim().toLowerCase();
+    const emailNormalizado = email
+      .trim()
+      .toLowerCase();
 
     if (!emailNormalizado || !senha) {
-      setErro("Informe o e-mail e a senha.");
+      setErro(
+        "Informe o e-mail e a senha."
+      );
       return;
     }
 
@@ -179,15 +216,13 @@ export default function Admin() {
     setCriando(true);
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const token = await obterToken();
 
-      if (!session?.access_token) {
+      if (!token) {
         setErro(
           "Sua sessão expirou. Faça login novamente."
         );
-        setCriando(false);
+        router.replace("/login");
         return;
       }
 
@@ -197,7 +232,7 @@ export default function Admin() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             email: emailNormalizado,
@@ -213,57 +248,69 @@ export default function Admin() {
           resultado.error ||
             "Não foi possível criar o usuário."
         );
-        setCriando(false);
         return;
       }
 
-      setMensagem("Usuário criado com sucesso.");
+      /*
+       * Coloca o usuário retornado pela API
+       * imediatamente na lista.
+       *
+       * Isso evita depender de cache ou de
+       * uma segunda requisição para atualizar a tela.
+       */
+      if (resultado.usuario) {
+        setUsuarios((lista) => {
+          const existe = lista.some(
+            (usuario) =>
+              usuario.id ===
+              resultado.usuario.id
+          );
+
+          if (existe) {
+            return lista.map((usuario) =>
+              usuario.id ===
+              resultado.usuario.id
+                ? resultado.usuario
+                : usuario
+            );
+          }
+
+          return [
+            ...lista,
+            resultado.usuario,
+          ];
+        });
+      }
+
+      if (resultado.reparado) {
+        setMensagem(
+          "Usuário sincronizado e acesso liberado com sucesso."
+        );
+      } else {
+        setMensagem(
+          "Usuário criado com sucesso."
+        );
+      }
 
       setEmail("");
       setSenha("");
+    } catch (error) {
+      console.error(error);
 
-      /*
-       * Recarrega a lista diretamente da API,
-       * ignorando cache.
-       */
-      const respostaLista = await fetch(
-        `/api/admin/users?t=${Date.now()}`,
-        {
-          method: "GET",
-          cache: "no-store",
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-            "Cache-Control": "no-cache",
-          },
-        }
+      setErro(
+        "Erro ao conectar com o servidor."
       );
-
-      const resultadoLista =
-        await respostaLista.json();
-
-      if (respostaLista.ok) {
-        setUsuarios(
-          resultadoLista.usuarios || []
-        );
-      } else {
-        setErro(
-          resultadoLista.error ||
-            "Usuário criado, mas não foi possível atualizar a lista."
-        );
-      }
-    } catch {
-      setErro("Erro ao conectar com o servidor.");
     } finally {
       setCriando(false);
     }
   }
 
-  const usuariosFiltrados = usuarios.filter(
-    (usuario) =>
+  const usuariosFiltrados =
+    usuarios.filter((usuario) =>
       (usuario.email || "")
         .toLowerCase()
         .includes(busca.toLowerCase())
-  );
+    );
 
   if (carregando) {
     return (
@@ -296,8 +343,6 @@ export default function Admin() {
           </button>
         </div>
 
-        {/* CRIAR USUÁRIO */}
-
         <div className="mb-8 rounded-xl border border-gray-800 bg-[#0b0e13] p-6">
           <h2 className="mb-4 text-xl font-semibold">
             Criar novo usuário
@@ -314,8 +359,7 @@ export default function Admin() {
               onChange={(e) =>
                 setEmail(e.target.value)
               }
-              disabled={criando}
-              className="rounded-lg border border-gray-700 bg-[#07090d] px-4 py-3 text-white outline-none focus:border-blue-500 disabled:opacity-50"
+              className="rounded-lg border border-gray-700 bg-[#07090d] px-4 py-3 text-white outline-none focus:border-blue-500"
             />
 
             <input
@@ -325,8 +369,7 @@ export default function Admin() {
               onChange={(e) =>
                 setSenha(e.target.value)
               }
-              disabled={criando}
-              className="rounded-lg border border-gray-700 bg-[#07090d] px-4 py-3 text-white outline-none focus:border-blue-500 disabled:opacity-50"
+              className="rounded-lg border border-gray-700 bg-[#07090d] px-4 py-3 text-white outline-none focus:border-blue-500"
             />
 
             <button
@@ -353,8 +396,6 @@ export default function Admin() {
           )}
         </div>
 
-        {/* BUSCAR USUÁRIO */}
-
         <div className="mb-4">
           <input
             type="text"
@@ -366,8 +407,6 @@ export default function Admin() {
             className="w-full rounded-lg border border-gray-700 bg-[#0b0e13] px-4 py-3 text-white outline-none focus:border-blue-500"
           />
         </div>
-
-        {/* LISTA DE USUÁRIOS */}
 
         <div className="overflow-hidden rounded-xl border border-gray-800">
 
@@ -421,17 +460,15 @@ export default function Admin() {
             </div>
           ))}
 
-          {usuariosFiltrados.length === 0 &&
-            !erro && (
-              <div className="p-6 text-center text-gray-400">
-                {busca
-                  ? "Nenhum usuário encontrado para essa busca."
-                  : "Nenhum usuário encontrado."}
-              </div>
-            )}
+          {usuariosFiltrados.length === 0 && (
+            <div className="p-6 text-center text-gray-400">
+              {busca
+                ? "Nenhum usuário encontrado para essa busca."
+                : "Nenhum usuário encontrado."}
+            </div>
+          )}
 
         </div>
-
       </div>
     </main>
   );
