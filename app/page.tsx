@@ -1877,12 +1877,12 @@ function toggleFavorite(promptId: number) {
       <div className="flex flex-wrap gap-2.5">
 
         {[
-          "POV",
-          "UGC",
-          "Mirror Self",
-          "Ultrarrealista",
-          "Outros",
-        ].map((category) => (
+  "POV",
+  "UGC",
+  "MIRROR SELF",
+  "ULTRARREALISTA",
+  "OUTROS",
+].map((category) => (
           <button
             key={category}
             onClick={() => setSelectedCategory(category)}
@@ -1897,7 +1897,18 @@ function toggleFavorite(promptId: number) {
         ))}
 
       </div>
-
+<button
+  onClick={() => {
+    setSearch("");
+    setFilter("Todos");
+    setSelectedAI("Todas");
+    setSelectedCategory("Todas");
+    setShowFavorites(false);
+  }}
+  className="mt-4 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-2.5 text-xs font-medium text-gray-400 transition-all duration-300 hover:border-blue-500/40 hover:bg-blue-500/10 hover:text-blue-400"
+>
+  Limpar filtros
+</button>
     </section>
   </>
 )}
