@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+export const dynamic = "force-dynamic";
+
 function criarSupabaseAdmin() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -83,7 +85,13 @@ export async function GET(request: Request) {
           error:
             "Apenas administradores podem acessar os usuários.",
         },
-        { status: 403 }
+        {
+          status: 403,
+          headers: {
+            "Cache-Control":
+              "no-store, no-cache, must-revalidate",
+          },
+        }
       );
     }
 
@@ -102,13 +110,28 @@ export async function GET(request: Request) {
         {
           error: error.message,
         },
-        { status: 500 }
+        {
+          status: 500,
+          headers: {
+            "Cache-Control":
+              "no-store, no-cache, must-revalidate",
+          },
+        }
       );
     }
 
-    return NextResponse.json({
-      usuarios: data || [],
-    });
+    return NextResponse.json(
+      {
+        usuarios: data || [],
+      },
+      {
+        status: 200,
+        headers: {
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate",
+        },
+      }
+    );
   } catch (error) {
     console.error(
       "Erro interno ao carregar usuários:",
@@ -119,7 +142,13 @@ export async function GET(request: Request) {
       {
         error: "Erro interno ao carregar usuários.",
       },
-      { status: 500 }
+      {
+        status: 500,
+        headers: {
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate",
+        },
+      }
     );
   }
 }
@@ -223,9 +252,6 @@ export async function POST(request: Request) {
     /*
      * SEGUNDA PROTEÇÃO:
      * criar o usuário no Supabase Auth.
-     *
-     * O Supabase Auth já impede duas contas com
-     * o mesmo e-mail.
      */
     const {
       data: novoUsuario,
@@ -242,17 +268,14 @@ export async function POST(request: Request) {
         criarErro
       );
 
-      /*
-       * Se a conta já existe no Auth, informamos
-       * claramente ao administrador.
-       */
       const mensagem =
         criarErro?.message?.toLowerCase() || "";
 
       if (
         mensagem.includes("already") ||
         mensagem.includes("exists") ||
-        mensagem.includes("registered")
+        mensagem.includes("registered") ||
+        mensagem.includes("duplicate")
       ) {
         return NextResponse.json(
           {
@@ -291,8 +314,7 @@ export async function POST(request: Request) {
 
     /*
      * Se falhar a criação do acesso,
-     * apagamos a conta criada no Auth para
-     * não deixar usuário órfão.
+     * apagar a conta criada no Auth.
      */
     if (acessoError || !acesso) {
       console.error(
@@ -304,10 +326,6 @@ export async function POST(request: Request) {
         novoUsuario.user.id
       );
 
-      /*
-       * 23505 = violação de chave única.
-       * Isso protege contra duas requisições simultâneas.
-       */
       if (acessoError?.code === "23505") {
         return NextResponse.json(
           {
@@ -333,7 +351,12 @@ export async function POST(request: Request) {
         success: true,
         usuario: acesso,
       },
-      { status: 201 }
+      {
+        status: 201,
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
     );
   } catch (error) {
     console.error(
@@ -414,10 +437,18 @@ export async function PATCH(request: Request) {
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      usuario: data,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        usuario: data,
+      },
+      {
+        status: 200,
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
+    );
   } catch (error) {
     console.error(
       "Erro interno ao alterar usuário:",

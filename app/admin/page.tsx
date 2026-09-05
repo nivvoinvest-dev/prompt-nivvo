@@ -25,126 +25,154 @@ export default function Admin() {
   const [mensagem, setMensagem] = useState("");
 
   useEffect(() => {
-  async function verificarAdmin() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    async function verificarAdmin() {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-    if (!user) {
-      router.replace("/login");
-      return;
+        if (!user) {
+          router.replace("/login");
+          return;
+        }
+
+        const { data: acesso, error } = await supabase
+          .from("user_access")
+          .select("id, email, active, role")
+          .eq("email", user.email)
+          .maybeSingle();
+
+        if (
+          error ||
+          !acesso ||
+          acesso.active !== true ||
+          acesso.role !== "admin"
+        ) {
+          router.replace("/");
+          return;
+        }
+
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!session?.access_token) {
+          router.replace("/login");
+          return;
+        }
+
+        const resposta = await fetch(
+          `/api/admin/users?t=${Date.now()}`,
+          {
+            method: "GET",
+            cache: "no-store",
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+              "Cache-Control": "no-cache",
+            },
+          }
+        );
+
+        const resultado = await resposta.json();
+
+        if (!resposta.ok) {
+          setErro(
+            resultado.error ||
+              "Não foi possível carregar os usuários."
+          );
+        } else {
+          setUsuarios(resultado.usuarios || []);
+        }
+
+        setCarregando(false);
+      } catch {
+        setErro(
+          "Não foi possível verificar seu acesso. Tente novamente."
+        );
+        setCarregando(false);
+      }
     }
 
-    const { data: acesso, error } = await supabase
-      .from("user_access")
-      .select("id, email, active, role")
-      .eq("email", user.email)
-      .maybeSingle();
+    verificarAdmin();
+  }, [router]);
 
-    if (
-      error ||
-      !acesso ||
-      acesso.active !== true ||
-      acesso.role !== "admin"
-    ) {
-      router.replace("/");
-      return;
-    }
+  async function alterarAcesso(
+    id: number,
+    ativoAtual: boolean
+  ) {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        alert("Sua sessão expirou. Faça login novamente.");
+        router.replace("/login");
+        return;
+      }
 
-    if (!session?.access_token) {
-      router.replace("/login");
-      return;
-    }
-
-    const resposta = await fetch("/api/admin/users", {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
-    });
-
-    const resultado = await resposta.json();
-
-    if (!resposta.ok) {
-      setErro(
-        resultado.error || "Não foi possível carregar os usuários."
+      const resposta = await fetch(
+        `/api/admin/users?t=${Date.now()}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+            "Cache-Control": "no-cache",
+          },
+          body: JSON.stringify({
+            id,
+            active: !ativoAtual,
+          }),
+        }
       );
-    } else {
-      setUsuarios(resultado.usuarios || []);
-    }
 
-    setCarregando(false);
-  }
+      const resultado = await resposta.json();
 
-  verificarAdmin();
-}, [router]);
+      if (!resposta.ok) {
+        alert(
+          resultado.error ||
+            "Não foi possível alterar o acesso."
+        );
+        return;
+      }
 
- async function alterarAcesso(id: number, ativoAtual: boolean) {
-  try {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session?.access_token) {
-      alert("Sua sessão expirou. Faça login novamente.");
-      router.replace("/login");
-      return;
-    }
-
-    const resposta = await fetch("/api/admin/users", {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        id,
-        active: !ativoAtual,
-      }),
-    });
-
-    const resultado = await resposta.json();
-
-    if (!resposta.ok) {
-      alert(
-        resultado.error ||
-          "Não foi possível alterar o acesso."
+      setUsuarios((lista) =>
+        lista.map((usuario) =>
+          usuario.id === id
+            ? {
+                ...usuario,
+                active: resultado.usuario.active,
+              }
+            : usuario
+        )
       );
-      return;
+    } catch {
+      alert("Erro ao conectar com o servidor.");
     }
-
-    setUsuarios((lista) =>
-      lista.map((usuario) =>
-        usuario.id === id
-          ? {
-              ...usuario,
-              active: resultado.usuario.active,
-            }
-          : usuario
-      )
-    );
-  } catch {
-    alert("Erro ao conectar com o servidor.");
   }
-}
 
   async function criarUsuario(e: React.FormEvent) {
     e.preventDefault();
 
+    if (criando) {
+      return;
+    }
+
     setErro("");
     setMensagem("");
 
-    if (!email || !senha) {
+    const emailNormalizado = email.trim().toLowerCase();
+
+    if (!emailNormalizado || !senha) {
       setErro("Informe o e-mail e a senha.");
       return;
     }
 
     if (senha.length < 6) {
-      setErro("A senha precisa ter pelo menos 6 caracteres.");
+      setErro(
+        "A senha precisa ter pelo menos 6 caracteres."
+      );
       return;
     }
 
@@ -156,28 +184,34 @@ export default function Admin() {
       } = await supabase.auth.getSession();
 
       if (!session?.access_token) {
-        setErro("Sua sessão expirou. Faça login novamente.");
+        setErro(
+          "Sua sessão expirou. Faça login novamente."
+        );
         setCriando(false);
         return;
       }
 
-      const resposta = await fetch("/api/admin/users", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          email,
-          password: senha,
-        }),
-      });
+      const resposta = await fetch(
+        "/api/admin/users",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            email: emailNormalizado,
+            password: senha,
+          }),
+        }
+      );
 
       const resultado = await resposta.json();
 
       if (!resposta.ok) {
         setErro(
-          resultado.error || "Não foi possível criar o usuário."
+          resultado.error ||
+            "Não foi possível criar o usuário."
         );
         setCriando(false);
         return;
@@ -188,29 +222,47 @@ export default function Admin() {
       setEmail("");
       setSenha("");
 
-      const respostaLista = await fetch("/api/admin/users", {
-  method: "GET",
-  headers: {
-    Authorization: `Bearer ${session.access_token}`,
-  },
-});
+      /*
+       * Recarrega a lista diretamente da API,
+       * ignorando cache.
+       */
+      const respostaLista = await fetch(
+        `/api/admin/users?t=${Date.now()}`,
+        {
+          method: "GET",
+          cache: "no-store",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            "Cache-Control": "no-cache",
+          },
+        }
+      );
 
-const resultadoLista = await respostaLista.json();
+      const resultadoLista =
+        await respostaLista.json();
 
-if (respostaLista.ok) {
-  setUsuarios(resultadoLista.usuarios || []);
-}
+      if (respostaLista.ok) {
+        setUsuarios(
+          resultadoLista.usuarios || []
+        );
+      } else {
+        setErro(
+          resultadoLista.error ||
+            "Usuário criado, mas não foi possível atualizar a lista."
+        );
+      }
     } catch {
       setErro("Erro ao conectar com o servidor.");
+    } finally {
+      setCriando(false);
     }
-
-    setCriando(false);
   }
 
-  const usuariosFiltrados = usuarios.filter((usuario) =>
-    (usuario.email || "")
-      .toLowerCase()
-      .includes(busca.toLowerCase())
+  const usuariosFiltrados = usuarios.filter(
+    (usuario) =>
+      (usuario.email || "")
+        .toLowerCase()
+        .includes(busca.toLowerCase())
   );
 
   if (carregando) {
@@ -259,16 +311,22 @@ if (respostaLista.ok) {
               type="email"
               placeholder="E-mail"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="rounded-lg border border-gray-700 bg-[#07090d] px-4 py-3 text-white outline-none focus:border-blue-500"
+              onChange={(e) =>
+                setEmail(e.target.value)
+              }
+              disabled={criando}
+              className="rounded-lg border border-gray-700 bg-[#07090d] px-4 py-3 text-white outline-none focus:border-blue-500 disabled:opacity-50"
             />
 
             <input
               type="password"
               placeholder="Senha"
               value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              className="rounded-lg border border-gray-700 bg-[#07090d] px-4 py-3 text-white outline-none focus:border-blue-500"
+              onChange={(e) =>
+                setSenha(e.target.value)
+              }
+              disabled={criando}
+              className="rounded-lg border border-gray-700 bg-[#07090d] px-4 py-3 text-white outline-none focus:border-blue-500 disabled:opacity-50"
             />
 
             <button
@@ -276,7 +334,9 @@ if (respostaLista.ok) {
               disabled={criando}
               className="rounded-lg bg-blue-600 px-6 py-3 font-semibold hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {criando ? "Criando..." : "Criar usuário"}
+              {criando
+                ? "Criando..."
+                : "Criar usuário"}
             </button>
           </form>
 
@@ -300,7 +360,9 @@ if (respostaLista.ok) {
             type="text"
             placeholder="Buscar usuário por e-mail..."
             value={busca}
-            onChange={(e) => setBusca(e.target.value)}
+            onChange={(e) =>
+              setBusca(e.target.value)
+            }
             className="w-full rounded-lg border border-gray-700 bg-[#0b0e13] px-4 py-3 text-white outline-none focus:border-blue-500"
           />
         </div>
@@ -321,7 +383,6 @@ if (respostaLista.ok) {
               key={usuario.id}
               className="grid grid-cols-4 items-center border-t border-gray-800 p-4"
             >
-
               <div className="break-all">
                 {usuario.email}
               </div>
@@ -357,17 +418,17 @@ if (respostaLista.ok) {
                     : "Liberar"}
                 </button>
               </div>
-
             </div>
           ))}
 
-          {usuariosFiltrados.length === 0 && !erro && (
-            <div className="p-6 text-center text-gray-400">
-              {busca
-                ? "Nenhum usuário encontrado para essa busca."
-                : "Nenhum usuário encontrado."}
-            </div>
-          )}
+          {usuariosFiltrados.length === 0 &&
+            !erro && (
+              <div className="p-6 text-center text-gray-400">
+                {busca
+                  ? "Nenhum usuário encontrado para essa busca."
+                  : "Nenhum usuário encontrado."}
+              </div>
+            )}
 
         </div>
 
