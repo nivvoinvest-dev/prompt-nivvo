@@ -17,42 +17,72 @@ function criarSupabaseAdmin() {
 }
 
 /*
- * Localiza um usuário no Supabase Authentication pelo e-mail.
+ * ============================================================
+ * NORMALIZAR E-MAIL
+ * ============================================================
+ */
+function normalizarEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
+/*
+ * ============================================================
+ * ENCONTRAR USUÁRIO NO AUTHENTICATION
+ *
+ * Procura pelo e-mail usando a API administrativa do Supabase.
+ * ============================================================
  */
 async function encontrarUsuarioAuth(
   supabaseAdmin: ReturnType<typeof criarSupabaseAdmin>,
   email: string
 ) {
-  const { data, error } =
-    await supabaseAdmin.auth.admin.listUsers({
-      page: 1,
-      perPage: 1000,
-    });
+  const emailNormalizado = normalizarEmail(email);
 
-  if (error) {
-    return {
-      user: null,
-      error,
-    };
+  let pagina = 1;
+
+  while (true) {
+    const { data, error } =
+      await supabaseAdmin.auth.admin.listUsers({
+        page: pagina,
+        perPage: 1000,
+      });
+
+    if (error) {
+      return {
+        user: null,
+        error,
+      };
+    }
+
+    const usuario = data.users.find(
+      (item) =>
+        item.email?.trim().toLowerCase() === emailNormalizado
+    );
+
+    if (usuario) {
+      return {
+        user: usuario,
+        error: null,
+      };
+    }
+
+    if (data.users.length < 1000) {
+      break;
+    }
+
+    pagina++;
   }
 
-  const emailNormalizado = email.trim().toLowerCase();
-
-  const user =
-    data.users.find(
-      (usuario) =>
-        usuario.email?.trim().toLowerCase() ===
-        emailNormalizado
-    ) || null;
-
   return {
-    user,
+    user: null,
     error: null,
   };
 }
 
 /*
- * Verifica se quem está fazendo a requisição é administrador.
+ * ============================================================
+ * VERIFICAR ADMIN
+ * ============================================================
  */
 async function verificarAdmin(request: Request) {
   const supabaseAdmin = criarSupabaseAdmin();
@@ -66,7 +96,9 @@ async function verificarAdmin(request: Request) {
     };
   }
 
-  const token = authHeader.replace("Bearer ", "").trim();
+  const token = authHeader
+    .replace("Bearer ", "")
+    .trim();
 
   if (!token) {
     return {
@@ -87,7 +119,7 @@ async function verificarAdmin(request: Request) {
     };
   }
 
-  const emailAdmin = user.email.trim().toLowerCase();
+  const emailAdmin = normalizarEmail(user.email);
 
   const {
     data: acesso,
@@ -145,7 +177,9 @@ export async function GET(request: Request) {
     } = await supabaseAdmin
       .from("user_access")
       .select("id, email, active, role")
-      .order("id", { ascending: true });
+      .order("id", {
+        ascending: true,
+      });
 
     if (error) {
       console.error(
@@ -193,24 +227,32 @@ export async function GET(request: Request) {
 /*
  * ============================================================
  * POST
- * Cria/sincroniza usuário.
  *
- * REGRA:
+ * CRIA / SINCRONIZA USUÁRIO
  *
- * 1. Se não existe no Auth:
- *      cria no Auth.
+ * Regras:
  *
- * 2. Se já existe no Auth:
- *      reutiliza a conta.
+ * 1. Procura o e-mail no user_access.
  *
- * 3. Se existe no user_access:
- *      NÃO tenta inserir outra linha.
- *      Atualiza a existente.
+ * 2. Procura o e-mail no Authentication.
  *
- * 4. Se não existe no user_access:
- *      cria a autorização.
+ * 3. Se não existir no Authentication:
+ *      cria.
  *
- * Assim evitamos usuário órfão e erro de UNIQUE.
+ * 4. Se já existir no Authentication:
+ *      reutiliza.
+ *
+ * 5. Se existir user_access:
+ *      atualiza o registro.
+ *
+ * 6. Se não existir user_access:
+ *      faz upsert usando o e-mail como chave única.
+ *
+ * O upsert é importante porque evita o problema de duas
+ * requisições simultâneas gerarem:
+ *
+ * duplicate key value violates unique constraint
+ *
  * ============================================================
  */
 export async function POST(request: Request) {
@@ -234,7 +276,7 @@ export async function POST(request: Request) {
 
     const email =
       typeof body?.email === "string"
-        ? body.email.trim().toLowerCase()
+        ? normalizarEmail(body.email)
         : "";
 
     const password =
@@ -265,7 +307,7 @@ export async function POST(request: Request) {
     /*
      * ========================================================
      * PASSO 1
-     * Verifica se já existe registro no user_access.
+     * Procurar acesso existente.
      * ========================================================
      */
     const {
@@ -295,11 +337,11 @@ export async function POST(request: Request) {
     /*
      * ========================================================
      * PASSO 2
-     * Procura a conta correspondente no Authentication.
+     * Procurar no Authentication.
      * ========================================================
      */
     const {
-      user: usuarioAuth,
+      user: usuarioAuthExistente,
       error: authBuscaError,
     } = await encontrarUsuarioAuth(
       supabaseAdmin,
@@ -321,18 +363,12 @@ export async function POST(request: Request) {
       );
     }
 
-    let usuarioFinal = usuarioAuth;
+    let usuarioFinal = usuarioAuthExistente;
 
     /*
      * ========================================================
      * PASSO 3
-     * Se não existe no Authentication, cria.
-     *
-     * IMPORTANTE:
-     * Não bloqueamos a criação só porque user_access
-     * já possui o e-mail.
-     *
-     * Isso resolve exatamente o problema atual.
+     * Criar Authentication se ainda não existir.
      * ========================================================
      */
     if (!usuarioFinal) {
@@ -346,118 +382,129 @@ export async function POST(request: Request) {
           email_confirm: true,
         });
 
-      if (criarErro || !novoUsuario.user) {
-        console.error(
-          "Erro ao criar usuário no Authentication:",
+      if (!criarErro && novoUsuario.user) {
+        usuarioFinal = novoUsuario.user;
+      } else {
+        /*
+         * Pode acontecer de outra requisição ter criado o
+         * usuário exatamente ao mesmo tempo.
+         *
+         * Nesse caso, procuramos novamente antes de retornar
+         * erro.
+         */
+        console.warn(
+          "Falha na criação inicial do Authentication. Tentando localizar novamente:",
           criarErro
         );
 
-        return NextResponse.json(
-          {
-            error:
-              criarErro?.message ||
-              "Não foi possível criar o usuário no Authentication.",
-          },
-          { status: 400 }
+        const {
+          user: usuarioDepois,
+          error: novaBuscaError,
+        } = await encontrarUsuarioAuth(
+          supabaseAdmin,
+          email
         );
-      }
 
-      usuarioFinal = novoUsuario.user;
+        if (novaBuscaError) {
+          console.error(
+            "Erro ao procurar usuário novamente no Authentication:",
+            novaBuscaError
+          );
+
+          return NextResponse.json(
+            {
+              error:
+                "Não foi possível verificar o usuário no Authentication.",
+            },
+            { status: 500 }
+          );
+        }
+
+        if (!usuarioDepois) {
+          return NextResponse.json(
+            {
+              error:
+                criarErro?.message ||
+                "Não foi possível criar o usuário no Authentication.",
+            },
+            { status: 400 }
+          );
+        }
+
+        usuarioFinal = usuarioDepois;
+      }
+    }
+
+    /*
+     * ========================================================
+     * SEGURANÇA
+     *
+     * Neste ponto precisamos obrigatoriamente ter um usuário
+     * válido no Authentication.
+     * ========================================================
+     */
+    if (!usuarioFinal) {
+      return NextResponse.json(
+        {
+          error:
+            "Não foi possível obter o usuário no Authentication.",
+        },
+        { status: 500 }
+      );
     }
 
     /*
      * ========================================================
      * PASSO 4
-     * Agora garantimos o user_access.
+     *
+     * SINCRONIZAR user_access
      *
      * Se já existe:
-     *      atualiza para ativo.
+     *   atualiza somente active/email e preserva role.
      *
      * Se não existe:
-     *      cria.
+     *   cria usando upsert.
      *
-     * Portanto nunca tentamos inserir uma segunda linha
-     * com o mesmo e-mail.
+     * O upsert elimina a condição de corrida que estava
+     * causando o erro 23505.
      * ========================================================
      */
-    let acessoFinal = acessoExistente;
 
-    if (acessoExistente) {
-      const {
-        data: acessoAtualizado,
-        error: atualizarAcessoError,
-      } = await supabaseAdmin
-        .from("user_access")
-        .update({
+    const roleFinal =
+      acessoExistente?.role || "user";
+
+    const {
+      data: acessoFinal,
+      error: acessoUpsertError,
+    } = await supabaseAdmin
+      .from("user_access")
+      .upsert(
+        {
           email,
           active: true,
-          role:
-            acessoExistente.role || "user",
-        })
-        .eq("id", acessoExistente.id)
-        .select("id, email, active, role")
-        .single();
-
-      if (atualizarAcessoError || !acessoAtualizado) {
-        console.error(
-          "Erro ao atualizar user_access:",
-          atualizarAcessoError
-        );
-
-        return NextResponse.json(
-          {
-            error:
-              atualizarAcessoError?.message ||
-              "Não foi possível atualizar o acesso do usuário.",
-          },
-          { status: 500 }
-        );
-      }
-
-      acessoFinal = acessoAtualizado;
-    } else {
-      const {
-        data: novoAcesso,
-        error: criarAcessoError,
-      } = await supabaseAdmin
-        .from("user_access")
-        .insert({
-          email,
-          active: true,
-          role: "user",
-        })
-        .select("id, email, active, role")
-        .single();
-
-      if (criarAcessoError || !novoAcesso) {
-        console.error(
-          "Erro ao criar user_access:",
-          criarAcessoError
-        );
-
-        /*
-         * Se acabamos de criar o Auth e falhou a criação
-         * do acesso, removemos a conta recém-criada.
-         *
-         * Isso evita deixar uma conta Auth sem autorização.
-         */
-        if (!usuarioAuth && usuarioFinal?.id) {
-          await supabaseAdmin.auth.admin.deleteUser(
-            usuarioFinal.id
-          );
+          role: roleFinal,
+        },
+        {
+          onConflict: "email",
         }
+      )
+      .select("id, email, active, role")
+      .single();
 
-        return NextResponse.json(
-          {
-            error:
-              criarAcessoError?.message ||
-              "Não foi possível criar o acesso do usuário.",
-          },
-          { status: 500 }
-        );
-      }
+    if (acessoUpsertError || !acessoFinal) {
+      console.error(
+        "Erro ao sincronizar user_access:",
+        acessoUpsertError
+      );
 
-      acessoFinal = novoAcesso;
+      return NextResponse.json(
+        {
+          error:
+            acessoUpsertError?.message ||
+            "Não foi possível sincronizar o acesso do usuário.",
+        },
+        { status: 500 }
+      );
     }
 
     /*
@@ -471,7 +518,9 @@ export async function POST(request: Request) {
         usuario: acessoFinal,
         auth_user_id: usuarioFinal.id,
       },
-      { status: 201 }
+      {
+        status: acessoExistente ? 200 : 201,
+      }
     );
   } catch (error) {
     console.error(
