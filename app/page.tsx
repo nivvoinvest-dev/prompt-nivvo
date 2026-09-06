@@ -270,11 +270,11 @@ function toggleFavorite(promptId: number) {
       <div>
 
         <h1 className="text-sm font-bold tracking-[0.15em] text-white">
-          PROMPTS
+          NIVVO
         </h1>
 
         <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.25em] text-blue-500">
-          NIVVO
+          LAB
         </p>
 
       </div>
@@ -410,7 +410,16 @@ function toggleFavorite(promptId: number) {
 {/* Hub Boss IA´s Ilimitadas */}
 
 <button
-  onClick={() => setActivePage("hub-boss")}
+  onClick={() => {
+  setActivePage("hub-boss");
+
+  setTimeout(() => {
+    document.getElementById("hub-boss")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, 100);
+}}
   className="flex w-full items-center gap-3 rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-sm font-medium text-blue-400 transition-all duration-300 hover:-translate-y-0.5 hover:border-blue-500/50 hover:bg-blue-500/20 hover:shadow-lg hover:shadow-blue-500/10"
 >
   <span className="text-base">🔥</span>
@@ -459,7 +468,7 @@ function toggleFavorite(promptId: number) {
 
     <div>
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-500">
-        PROMPTS NIVVO
+        NIVVO LAB
       </p>
 
       <p className="mt-1 text-sm text-gray-500">
@@ -665,7 +674,10 @@ function toggleFavorite(promptId: number) {
 
 {activePage === "hub-boss" && (
   <>
-    <section className="mx-auto max-w-7xl px-6 pb-20 pt-16 lg:px-10 lg:pt-20">
+    <section
+  id="hub-boss"
+  className="mx-auto max-w-7xl px-6 pb-20 pt-16 lg:px-10 lg:pt-20"
+>
 
 
   {/* HERO HUB BOSS */}
@@ -1779,7 +1791,7 @@ function toggleFavorite(promptId: number) {
 
           <div>
             <p className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-blue-500">
-              Biblioteca NIVVO
+              NIVVO LAB
             </p>
 
             <h2 className="max-w-4xl text-4xl font-bold leading-tight tracking-tight md:text-6xl lg:text-7xl">
@@ -1900,10 +1912,8 @@ function toggleFavorite(promptId: number) {
     </section>
   </>
 )}
-
-
-      {/* PROMPTS */}
-      <section className="mx-auto max-w-7xl px-6 pb-20 pt-10 lg:px-10 lg:pt-12">
+{activePage !== "hub-boss" && (
+  <section className="mx-auto max-w-7xl px-6 pb-20 pt-10 lg:px-10 lg:pt-12">
 
   <div className="mb-8 flex items-end justify-between border-b border-white/10 pb-5">
 
@@ -1924,7 +1934,7 @@ function toggleFavorite(promptId: number) {
     </div>
 
     <div className="hidden rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-xs text-gray-400 sm:block">
-      Biblioteca NIVVO
+      NIVVO LAB
     </div>
 
   </div>
@@ -1940,7 +1950,7 @@ function toggleFavorite(promptId: number) {
 >
 
 
-    {filteredPrompts.map((prompt) => (
+    {filteredPrompts.map((prompt, index) => (
 
       <article
         key={prompt.id}
@@ -2016,7 +2026,7 @@ function toggleFavorite(promptId: number) {
             <div className="mt-4 flex items-center justify-between">
 
               <span className="text-xs font-medium text-white/70 drop-shadow-lg">
-                {prompt.id}
+                {index + 1}
               </span>
 
               <button
@@ -2061,8 +2071,9 @@ function toggleFavorite(promptId: number) {
 )}
 
 </section>
-
-    </div>
+)}
+  
+</div>
 
   </div>
 {/* MENU MOBILE */}
