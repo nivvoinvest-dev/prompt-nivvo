@@ -1880,7 +1880,7 @@ function toggleFavorite(promptId: number) {
   "POV",
   "UGC",
   "MIRROR SELF",
-  "ULTRARREALISTA",
+  "CABIDE",
   "OUTROS",
 ].map((category) => (
           <button
