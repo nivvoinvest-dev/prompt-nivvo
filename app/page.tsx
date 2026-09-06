@@ -94,7 +94,11 @@ useEffect(() => {
 
       // Compatibilidade com o layout atual
       image: item.image_url || "",
-      type: item.category || "Prompt",
+      type: item.video_url
+        ? "Vídeos"
+        : item.image_url
+          ? "Imagens"
+          : "Outros",
       platform: "NIVVO",
       ai: "Todas",
       prompt: item.content,
@@ -192,7 +196,7 @@ const matchesSearch = text.includes(search.toLowerCase());
 
 
     const matchesFilter =
-  filter === "Todos" || prompt.type === filter;
+      filter === "Todos" || prompt.type === filter;
 
 const matchesAI =
   selectedAI === "Todas" || prompt.ai === selectedAI;
@@ -226,23 +230,37 @@ function toggleFavorite(promptId: number) {
 
 
   async function copyPrompt(prompt: (typeof prompts)[number]) {
-  try {
-    await navigator.clipboard.writeText(
-      `${prompt.title}\n\n${prompt.description}\n\n${prompt.prompt}`
-    );
+    try {
+      const textoParaCopiar = prompt.content || prompt.prompt || "";
 
-    addRecent(prompt.id);
+      if (!textoParaCopiar.trim()) {
+        return;
+      }
 
-    setCopiedId(prompt.id);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(textoParaCopiar);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = textoParaCopiar;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
 
-    setTimeout(() => {
-      setCopiedId(null);
-    }, 2000);
+      addRecent(prompt.id);
+      setCopiedId(prompt.id);
 
-  } catch (error) {
-    console.error("Erro ao copiar o prompt:", error);
+      setTimeout(() => {
+        setCopiedId(null);
+      }, 2000);
+    } catch (error) {
+      console.error("Erro ao copiar o prompt:", error);
+    }
   }
-}
 
 
 
@@ -1790,6 +1808,20 @@ function toggleFavorite(promptId: number) {
                 <option value="Imagens">Imagens</option>
               </select>
 
+              {(search || filter !== "Todos" || selectedCategory !== "Todas") && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch("");
+                    setFilter("Todos");
+                    setSelectedCategory("Todas");
+                  }}
+                  className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-xs font-semibold text-gray-400 transition hover:border-blue-500/30 hover:text-white"
+                >
+                  Limpar filtros
+                </button>
+              )}
+
             </div>
 
             <span className="text-xs text-gray-600">
@@ -1822,13 +1854,7 @@ function toggleFavorite(promptId: number) {
 
       <div className="flex flex-wrap gap-2.5">
 
-        {[
-          "POV",
-          "UGC",
-          "Mirror Self",
-          "Ultrarrealista",
-          "Outros",
-        ].map((category) => (
+        {["Todas", ...categoryOptions.filter((category) => category !== "Todas")].map((category) => (
           <button
             key={category}
             onClick={() => setSelectedCategory(category)}
@@ -1887,7 +1913,7 @@ function toggleFavorite(promptId: number) {
 >
 
 
-    {filteredPrompts.map((prompt) => (
+    {filteredPrompts.map((prompt, index) => (
 
       <article
         key={prompt.id}
@@ -1898,13 +1924,23 @@ function toggleFavorite(promptId: number) {
 
         <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-gradient-to-br from-blue-950/40 via-[#10131a] to-[#07090d]">
 
-          {prompt.image ? (
-  <img
-    src={prompt.image}
-    alt={prompt.title}
-    className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
-  />
-) : (
+          {prompt.video_url ? (
+            <video
+              src={prompt.video_url}
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="auto"
+              className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+            />
+          ) : prompt.image_url ? (
+            <img
+              src={prompt.image_url}
+              alt={prompt.title}
+              className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+            />
+          ) : (
   <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-950 via-[#101827] to-black">
     <span className="text-4xl font-bold text-blue-400">
       {prompt.title.charAt(0).toUpperCase()}
@@ -1970,7 +2006,7 @@ function toggleFavorite(promptId: number) {
           <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-4">
 
             <span className="rounded-md border border-white/5 bg-white/[0.02] px-2 py-1 text-[10px] font-medium tracking-wider text-gray-600">
-              #{prompt.id.toString().padStart(3, "0")}
+              #{(index + 1).toString().padStart(3, "0")}
             </span>
 
             <button
@@ -1983,7 +2019,7 @@ function toggleFavorite(promptId: number) {
                   : "bg-blue-600 shadow-blue-500/20 hover:bg-blue-500 hover:shadow-blue-500/30"
               }`}
             >
-              {copiedId === prompt.id ? "✓ Copiado!" : "Copy Prompt"}
+              {copiedId === prompt.id ? "✓ Copiado!" : "Copiar prompt"}
             </button>
 
           </div>
