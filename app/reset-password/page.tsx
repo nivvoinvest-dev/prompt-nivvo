@@ -17,100 +17,39 @@ export default function ResetPasswordPage() {
         const url = new URL(window.location.href);
         const code = url.searchParams.get("code");
 
-        /*
-         * O Supabase pode enviar o link de recuperação
-         * usando o formato:
-         *
-         * /reset-password?code=...
-         *
-         * Nesse caso, trocamos o código pela sessão.
-         */
-        if (code) {
-          const { error } =
-            await supabase.auth.exchangeCodeForSession(code);
-
-          if (error) {
-            console.error(
-              "Erro ao trocar código pela sessão:",
-              error
-            );
-
-            setErro(
-              "Este link de acesso é inválido ou expirou. Solicite um novo link."
-            );
-
-            setCarregando(false);
-            return;
-          }
-
-          setTokenValido(true);
-          setCarregando(false);
-
-          window.history.replaceState(
-            {},
-            document.title,
-            "/reset-password"
+        if (!code) {
+          setErro(
+            "Este link de acesso é inválido ou expirou. Solicite um novo link."
           );
-
+          setCarregando(false);
           return;
         }
 
-        /*
-         * Também aceita o formato antigo com access_token
-         * no fragmento da URL.
-         */
-        const hash = window.location.hash;
+        const { error } =
+          await supabase.auth.exchangeCodeForSession(code);
 
-        if (hash) {
-          const params = new URLSearchParams(
-            hash.substring(1)
+        if (error) {
+          console.error(
+            "Erro ao validar código de recuperação:",
+            error
           );
 
-          const accessToken =
-            params.get("access_token");
+          setErro(
+            "Este link de acesso é inválido ou expirou. Solicite um novo link."
+          );
 
-          const refreshToken =
-            params.get("refresh_token");
-
-          if (accessToken && refreshToken) {
-            const { error } =
-              await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken,
-              });
-
-            if (error) {
-              console.error(
-                "Erro ao estabelecer sessão:",
-                error
-              );
-
-              setErro(
-                "Este link de acesso é inválido ou expirou. Solicite um novo link."
-              );
-
-              setCarregando(false);
-              return;
-            }
-
-            setTokenValido(true);
-            setCarregando(false);
-
-            window.history.replaceState(
-              {},
-              document.title,
-              "/reset-password"
-            );
-
-            return;
-          }
+          setCarregando(false);
+          return;
         }
 
-        setErro(
-          "Este link de acesso é inválido ou expirou. Solicite um novo link."
-        );
-
+        setTokenValido(true);
         setCarregando(false);
+
+        window.history.replaceState(
+          {},
+          document.title,
+          "/reset-password"
+        );
       } catch (error) {
         console.error(
           "Erro ao preparar recuperação:",
@@ -295,6 +234,7 @@ export default function ResetPasswordPage() {
         >
           Voltar para o login
         </button>
+
       </div>
     </main>
   );
