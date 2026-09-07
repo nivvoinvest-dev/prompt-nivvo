@@ -1983,7 +1983,7 @@ function toggleFavorite(promptId: number) {
               loop
               muted
               playsInline
-              preload="auto"
+              preload="metadata"
               className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-105"
             />
           ) : prompt.image_url ? (
