@@ -155,13 +155,17 @@ export default function Login() {
       <div className="w-full max-w-md rounded-[28px] border border-white/10 bg-[#0b0d11] p-8 shadow-2xl">
 
         {/* IDENTIDADE */}
-        <div className="mb-8 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-2xl font-bold shadow-lg shadow-blue-500/20">
-            N
-          </div>
+<div className="mb-8 text-center">
+  <div className="mx-auto flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl">
+    <img
+      src="/logo.jpeg.png"
+      alt="KNIGHTS LAB"
+      className="h-full w-full object-contain"
+    />
+  </div>
 
           <h1 className="mt-5 text-2xl font-bold tracking-tight">
-            NIVVO LAB
+            KNIGHTS LAB
           </h1>
 
           <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-gray-400">
