@@ -152,26 +152,28 @@ export default function Login() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#07090d] px-6 text-white">
-      <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0d1016] p-8 shadow-2xl">
+      <div className="w-full max-w-md rounded-[28px] border border-white/10 bg-[#0b0d11] p-8 shadow-2xl">
 
+        {/* IDENTIDADE */}
         <div className="mb-8 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-xl font-bold">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-2xl font-bold shadow-lg shadow-blue-500/20">
             N
           </div>
 
-          <h1 className="mt-5 text-2xl font-bold">
-            PROMPTS NIVVO
+          <h1 className="mt-5 text-2xl font-bold tracking-tight">
+            NIVVO LAB
           </h1>
 
-          <p className="mt-2 text-sm text-gray-500">
-            Entre para acessar sua biblioteca
+          <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-gray-400">
+            Entre com seu e-mail e senha para acessar a Biblioteca de Prompts.
           </p>
         </div>
 
         <form onSubmit={entrar} className="space-y-5">
 
+          {/* E-MAIL */}
           <div>
-            <label className="mb-2 block text-sm text-gray-400">
+            <label className="mb-2 block text-sm font-semibold text-gray-300">
               E-mail
             </label>
 
@@ -181,13 +183,14 @@ export default function Login() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
-              className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none focus:border-blue-500/50"
-              placeholder="seu@email.com"
+              className="w-full rounded-2xl border border-white/15 bg-black/20 px-4 py-4 text-sm text-white outline-none transition placeholder:text-gray-500 focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/20"
+              placeholder="seuemail@exemplo.com"
             />
           </div>
 
+          {/* SENHA */}
           <div>
-            <label className="mb-2 block text-sm text-gray-400">
+            <label className="mb-2 block text-sm font-semibold text-gray-300">
               Senha
             </label>
 
@@ -197,41 +200,75 @@ export default function Login() {
               onChange={(e) => setSenha(e.target.value)}
               required
               autoComplete="current-password"
-              className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none focus:border-blue-500/50"
-              placeholder="Sua senha"
+              className="w-full rounded-2xl border border-white/15 bg-black/20 px-4 py-4 text-sm text-white outline-none transition placeholder:text-gray-500 focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/20"
+              placeholder="••••••••"
             />
           </div>
 
+          {/* OPÇÕES */}
+          <div className="flex items-center justify-between gap-4 pt-0.5">
+
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-400">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-white/20 bg-black/20 accent-yellow-400"
+              />
+              <span>Manter conectado</span>
+            </label>
+
+            <button
+              type="button"
+              onClick={() => {
+                const form = document.getElementById(
+                  "recuperar-senha-form"
+                ) as HTMLFormElement | null;
+
+                form?.requestSubmit();
+              }}
+              disabled={carregando || recuperandoSenha}
+              className="text-sm text-gray-300 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Esqueci minha senha
+            </button>
+
+          </div>
+
+          {/* MENSAGEM DE ERRO */}
           {erro && (
             <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
               {erro}
             </div>
           )}
 
+          {/* MENSAGEM DE SUCESSO */}
           {mensagem && (
             <div className="rounded-xl border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-400">
               {mensagem}
             </div>
           )}
 
+          {/* BOTÃO ENTRAR */}
           <button
             type="submit"
             disabled={carregando || recuperandoSenha}
-            className="w-full rounded-xl bg-blue-600 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+           className="w-full rounded-2xl bg-blue-600 px-6 py-4 text-sm font-bold text-white shadow-[0_0_28px_rgba(37,99,235,0.28)] transition duration-200 hover:scale-[1.01] hover:bg-blue-500 hover:shadow-[0_0_36px_rgba(37,99,235,0.38)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
           >
             {carregando ? "Entrando..." : "Entrar"}
           </button>
 
         </form>
 
+        {/* RECUPERAÇÃO DE SENHA
+            Mantida separada para preservar a lógica atual.
+        */}
         <form
+          id="recuperar-senha-form"
           onSubmit={recuperarSenha}
-          className="mt-4"
+          className="hidden"
         >
           <button
             type="submit"
             disabled={carregando || recuperandoSenha}
-            className="w-full py-2 text-sm text-blue-400 transition hover:text-blue-300 disabled:opacity-50"
           >
             {recuperandoSenha
               ? "Enviando..."
