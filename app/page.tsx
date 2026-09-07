@@ -38,7 +38,7 @@ const [carregandoPrompts, setCarregandoPrompts] = useState(true);
   const [showFavorites, setShowFavorites] = useState(false);
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [selectedAI, setSelectedAI] = useState("Todas");
-  const [selectedCategory, setSelectedCategory] = useState("Todas");
+const [selectedCategory, setSelectedCategory] = useState("Todas");
 
   // VERIFICA ACESSO
   useEffect(() => {
@@ -194,7 +194,9 @@ const matchesSearch = text.includes(search.toLowerCase());
 
 
     const matchesFilter =
-  filter === "Todos" || prompt.type === filter;
+  filter === "Todos" ||
+  (filter === "Vídeos" && !!prompt.video_url) ||
+  (filter === "Imagens" && !!prompt.image_url);
 
 const matchesAI =
   selectedAI === "Todas" || prompt.ai === selectedAI;
@@ -249,8 +251,23 @@ function toggleFavorite(promptId: number) {
 
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(37,99,235,0.10),transparent_35%),#07090d] text-white">
+  <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(37,99,235,0.10),transparent_35%),#07090d] text-white">
 
+<a
+  href="https://wa.me/5582982150465?text=Ol%C3%A1!%20Preciso%20de%20ajuda%20com%20a%20Knights%20Lab."
+  target="_blank"
+  rel="noopener noreferrer"
+  aria-label="Falar com o suporte pelo WhatsApp"
+  className="fixed bottom-6 right-6 z-[100] flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#0d1016] shadow-2xl shadow-black/40 transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:border-green-500/50 hover:shadow-green-500/20"
+>
+  <img
+    src="/logo.jpeg"
+    alt="Suporte Knights Lab"
+    className="h-full w-full object-cover"
+  />
+</a>
+
+      {/* SIDEBAR */}
 
   <div className="flex min-h-screen">
 
@@ -274,12 +291,8 @@ function toggleFavorite(promptId: number) {
       <div>
 
         <h1 className="text-sm font-bold tracking-[0.15em] text-white">
-          KNIGHTS
-        </h1>
-
-        <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.25em] text-blue-500">
-          LAB
-        </p>
+  KNIGHTS LAB
+</h1>
 
       </div>
 
@@ -1779,7 +1792,7 @@ function toggleFavorite(promptId: number) {
 
       {/* CONTEÚDO PRINCIPAL — ESCONDIDO NO HUB BOSS */}
 
-{activePage !== "hub-boss" && (
+{(activePage === "home" || activePage === "explorar") && (
   <>
     {/* HERO */}
 
@@ -1799,15 +1812,14 @@ function toggleFavorite(promptId: number) {
             </p>
 
             <h2 className="max-w-4xl text-4xl font-bold leading-tight tracking-tight md:text-6xl lg:text-7xl">
-              Sua biblioteca de
+              Seu arsenal de prompts
               <span className="block text-gray-500">
-                prompts para IA.
+                para TikTok Shop.
               </span>
             </h2>
 
             <p className="mt-6 max-w-2xl text-base leading-7 text-gray-400 md:text-lg">
-              Encontre prompts prontos para criação de imagens,
-              vídeos e conteúdos com inteligência artificial.
+              Prompts prontos para criar conteúdos que chamam atenção, aumentam sua produtividade e ajudam você a vender mais.
             </p>
           </div>
 
@@ -1851,7 +1863,7 @@ function toggleFavorite(promptId: number) {
             </div>
 
             <span className="text-xs text-gray-600">
-              Use a busca e os filtros para encontrar o prompt ideal
+              Use a busca e os filtros para encontrar os prompts ideais
             </span>
 
           </div>
@@ -1916,7 +1928,7 @@ function toggleFavorite(promptId: number) {
     </section>
   </>
 )}
-{activePage !== "hub-boss" && (
+{activePage !== "recentes" && activePage !== "hub-boss" && (
   <section className="mx-auto max-w-7xl px-6 pb-20 pt-10 lg:px-10 lg:pt-12">
 
   <div className="mb-8 flex items-end justify-between border-b border-white/10 pb-5">
@@ -1938,7 +1950,7 @@ function toggleFavorite(promptId: number) {
     </div>
 
     <div className="hidden rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-xs text-gray-400 sm:block">
-     LAB
+     KNIGHTS LAB
     </div>
 
   </div>
@@ -2092,11 +2104,11 @@ function toggleFavorite(promptId: number) {
 
 
       setTimeout(() => {
-        document.getElementById("categorias")?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-      }, 100);
+  document.getElementById("biblioteca")?.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  });
+}, 100);
     }}
     className="flex flex-col items-center gap-1 px-3 py-1 text-[10px] text-gray-400 transition hover:text-blue-400"
   >
@@ -2159,17 +2171,14 @@ function toggleFavorite(promptId: number) {
   <button
     onClick={() => {
       setActivePage("recentes");
-      setShowFavorites(false);
+setShowFavorites(false);
 
-
-      setTimeout(() => {
-        document
-          .getElementById("recentes")
-          ?.scrollIntoView({
-            behavior: "smooth",
-            block: "start",
-          });
-      }, 100);
+setTimeout(() => {
+  document.getElementById("recentes")?.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  });
+}, 100);
     }}
     className="flex flex-col items-center gap-1 px-3 py-1 text-[10px] text-gray-400 transition hover:text-blue-400"
   >
@@ -2187,10 +2196,12 @@ function toggleFavorite(promptId: number) {
       setShowFavorites(false);
 
 
-      window.scrollTo({
-        top: 0,
-        behavior: "smooth",
-      });
+      setTimeout(() => {
+  document.getElementById("recentes")?.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  });
+}, 100);
     }}
     className="flex flex-col items-center gap-1 px-3 py-1 text-[10px] text-blue-400 transition hover:text-blue-300"
   >
@@ -2204,4 +2215,3 @@ function toggleFavorite(promptId: number) {
 </main>
   );
 }
-
