@@ -258,7 +258,7 @@ function toggleFavorite(promptId: number) {
   target="_blank"
   rel="noopener noreferrer"
   aria-label="Falar com o suporte pelo WhatsApp"
-  className="fixed bottom-6 right-6 z-[100] flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#0d1016] shadow-2xl shadow-black/40 transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:border-green-500/50 hover:shadow-green-500/20"
+  className="fixed bottom-24 right-6 z-[100] flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#0d1016] shadow-2xl shadow-black/40 transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:border-green-500/50 hover:shadow-green-500/20"
 >
   <img
     src="/logo.jpeg"
