@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "./lib/supabase";
 import { useRouter } from "next/navigation";
 
@@ -22,7 +22,51 @@ type Prompt = {
   ai: string;
   prompt: string;
 };
-  
+  function LazyVideo({
+  src,
+  className,
+}: {
+  src: string;
+  className?: string;
+}) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [shouldLoad, setShouldLoad] = useState(false);
+
+  useEffect(() => {
+    const video = videoRef.current;
+
+    if (!video) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShouldLoad(true);
+          observer.disconnect();
+        }
+      },
+      {
+        rootMargin: "300px 0px",
+      },
+    );
+
+    observer.observe(video);
+
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <video
+      ref={videoRef}
+      src={shouldLoad ? src : undefined}
+      autoPlay={shouldLoad}
+      loop
+      muted
+      playsInline
+      preload="metadata"
+      className={className}
+    />
+  );
+}
 export default function Home() {
   const router = useRouter();
 
@@ -1977,15 +2021,10 @@ function toggleFavorite(promptId: number) {
         <div className="relative aspect-[9/16] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-blue-950/40 via-[#10131a] to-[#07090d]">
 
           {prompt.video_url ? (
-            <video
-              src={prompt.video_url}
-              autoPlay
-              loop
-              muted
-              playsInline
-              preload="metadata"
-              className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-105"
-            />
+            <LazyVideo
+  src={prompt.video_url}
+  className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-105"
+/>
           ) : prompt.image_url ? (
             <img
               src={prompt.image_url}
