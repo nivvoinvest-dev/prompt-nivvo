@@ -158,7 +158,7 @@ export default function Login() {
 <div className="mb-8 text-center">
   <div className="mx-auto flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl">
     <img
-      src="/logo.jpeg.png"
+      src="/logo.jpeg"
       alt="KNIGHTS LAB"
       className="h-full w-full object-contain"
     />

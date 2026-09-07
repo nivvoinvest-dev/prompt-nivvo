@@ -263,14 +263,18 @@ function toggleFavorite(promptId: number) {
 
     <div className="flex items-center gap-3">
 
-      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-lg font-bold text-white shadow-lg shadow-blue-500/20">
-        N
-      </div>
+     <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl">
+  <img
+    src="/logo.jpeg"
+    alt="KNIGHTS LAB"
+    className="h-full w-full object-contain"
+  />
+</div>
 
       <div>
 
         <h1 className="text-sm font-bold tracking-[0.15em] text-white">
-          NIVVO
+          KNIGHTS
         </h1>
 
         <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.25em] text-blue-500">
@@ -442,7 +446,7 @@ function toggleFavorite(promptId: number) {
 
     <div>
       <p className="text-xs font-medium text-gray-300">
-        NIVVO
+        KNIGHTS LAB
       </p>
 
 
@@ -468,7 +472,7 @@ function toggleFavorite(promptId: number) {
 
     <div>
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-500">
-        NIVVO LAB
+        KNIGHTS LAB
       </p>
 
       <p className="mt-1 text-sm text-gray-500">
@@ -1634,7 +1638,7 @@ function toggleFavorite(promptId: number) {
             </h3>
 
             <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.25em] text-blue-500">
-              NIVVO
+              KNIGHTS LAB
             </p>
           </div>
 
@@ -1746,7 +1750,7 @@ function toggleFavorite(promptId: number) {
     <div className="flex flex-col gap-4 border-t border-white/10 px-6 py-6 text-xs text-gray-600 md:flex-row md:items-center md:justify-between md:px-10">
 
       <p>
-        © 2026 NIVVO. Todos os direitos reservados.
+        © 2026 KNIGHTS LAB. Todos os direitos reservados.
       </p>
 
       <div className="flex items-center gap-5">
@@ -1791,7 +1795,7 @@ function toggleFavorite(promptId: number) {
 
           <div>
             <p className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-blue-500">
-              NIVVO LAB
+              KNIGHTS LAB
             </p>
 
             <h2 className="max-w-4xl text-4xl font-bold leading-tight tracking-tight md:text-6xl lg:text-7xl">
@@ -1934,7 +1938,7 @@ function toggleFavorite(promptId: number) {
     </div>
 
     <div className="hidden rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-xs text-gray-400 sm:block">
-      NIVVO LAB
+     LAB
     </div>
 
   </div>
