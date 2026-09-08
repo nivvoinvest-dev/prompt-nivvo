@@ -73,17 +73,12 @@ export async function POST(request: Request) {
 
     const supabaseAdmin = criarSupabaseAdmin();
 
-    /*
-     * ============================================================
-     * COMPRA APROVADA
-     * ============================================================
-     */
+    // ============================================================
+    // COMPRA APROVADA
+    // ============================================================
 
     if (event === "purchase_approved") {
-      /*
-       * 1. Procurar o usuário no Authentication.
-       */
-
+      // 1. Procurar usuário existente
       const {
         data: usuarios,
         error: buscaAuthError,
@@ -112,58 +107,51 @@ export async function POST(request: Request) {
           usuario.email?.trim().toLowerCase() === email
       );
 
-      /*
-       * 2. Se não existir, criar o usuário.
-       *
-       * A senha é temporária e aleatória.
-       * O usuário não deve receber essa senha.
-       */
+      let userId: string;
+      let usuarioCriado = false;
 
+      // 2. Criar usuário se ainda não existir
       if (!usuarioExistente) {
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    "https://prompt-nivvo.vercel.app";
+        const {
+          data: novoUsuario,
+          error: usuarioError,
+        } = await supabaseAdmin.auth.admin.createUser({
+          email,
+          email_confirm: true,
+        });
 
-  const {
-    data: convite,
-    error: conviteError,
-  } =
-    await supabaseAdmin.auth.admin.inviteUserByEmail(
-      email,
-      {
-        redirectTo: `${siteUrl}/reset-password`,
+        if (usuarioError || !novoUsuario.user) {
+          console.error(
+            "Erro ao criar usuário:",
+            usuarioError
+          );
+
+          return NextResponse.json(
+            {
+              success: false,
+              error:
+                usuarioError?.message ||
+                "Não foi possível criar o usuário.",
+            },
+            { status: 500 }
+          );
+        }
+
+        userId = novoUsuario.user.id;
+        usuarioCriado = true;
+
+        console.log(
+          `Usuário criado no Supabase: ${email}`
+        );
+      } else {
+        userId = usuarioExistente.id;
+
+        console.log(
+          `Usuário já existente no Supabase: ${email}`
+        );
       }
-    );
 
-  if (conviteError || !convite.user) {
-    console.error(
-      "Erro ao enviar convite para o usuário:",
-      conviteError
-    );
-
-    return NextResponse.json(
-      {
-        success: false,
-        error:
-          conviteError?.message ||
-          "Não foi possível enviar o convite ao usuário.",
-      },
-      { status: 500 }
-    );
-  }
-
-  console.log(
-    `Usuário criado e convite enviado pela Cakto: ${email}`
-  );
-}
-
-      /*
-       * 3. Ativar o acesso.
-       *
-       * Se já existir, preserva o role atual.
-       * Se não existir, entra como user.
-       */
-
+      // 3. Consultar acesso existente
       const {
         data: acessoExistente,
         error: acessoConsultaError,
@@ -188,9 +176,11 @@ export async function POST(request: Request) {
         );
       }
 
+      // 4. Preservar role ou usar "user"
       const roleFinal =
         acessoExistente?.role || "user";
 
+      // 5. Liberar acesso
       const {
         data: acessoFinal,
         error: acessoUpsertError,
@@ -235,18 +225,17 @@ export async function POST(request: Request) {
           success: true,
           message: "Compra aprovada e acesso liberado.",
           email,
-          usuario_criado: !usuarioExistente,
+          user_id: userId,
+          usuario_criado: usuarioCriado,
           acesso: acessoFinal,
         },
         { status: 200 }
       );
     }
 
-    /*
-     * ============================================================
-     * REEMBOLSO / CHARGEBACK
-     * ============================================================
-     */
+    // ============================================================
+    // REEMBOLSO / CHARGEBACK
+    // ============================================================
 
     if (
       event === "refund" ||
@@ -294,11 +283,9 @@ export async function POST(request: Request) {
       );
     }
 
-    /*
-     * ============================================================
-     * EVENTO NÃO TRATADO
-     * ============================================================
-     */
+    // ============================================================
+    // EVENTO NÃO TRATADO
+    // ============================================================
 
     console.log(
       `Evento Cakto recebido sem ação: ${event}`
