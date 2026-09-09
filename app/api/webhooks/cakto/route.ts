@@ -4,16 +4,23 @@ import { createClient } from "@supabase/supabase-js";
 export const dynamic = "force-dynamic";
 
 function criarSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
-  );
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl) {
+    throw new Error("NEXT_PUBLIC_SUPABASE_URL não configurada.");
+  }
+
+  if (!serviceRoleKey) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY não configurada.");
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
 }
 
 function normalizarEmail(email: string) {
@@ -54,230 +61,247 @@ async function enviarEmailAcesso({
   const fromEmail = process.env.RESEND_FROM_EMAIL;
 
   if (!resendApiKey) {
-    throw new Error("RESEND_API_KEY não configurada.");
+    throw new Error(
+      "RESEND_API_KEY não configurada na Vercel."
+    );
   }
 
   if (!fromEmail) {
-    throw new Error("RESEND_FROM_EMAIL não configurada.");
+    throw new Error(
+      "RESEND_FROM_EMAIL não configurada na Vercel."
+    );
+  }
+
+  if (!fromEmail.includes("@")) {
+    throw new Error(
+      "RESEND_FROM_EMAIL está inválida. Use um endereço de e-mail válido."
+    );
   }
 
   const emailSeguro = escaparHtml(email);
   const senhaSegura = escaparHtml(senha);
   const siteUrlSeguro = escaparHtml(siteUrl);
 
-  const resposta = await fetch("https://api.resend.com/emails", {
-    method: "POST",
+  console.log(
+    `Iniciando envio do e-mail pelo Resend para: ${email}`
+  );
 
-    headers: {
-      Authorization: `Bearer ${resendApiKey}`,
-      "Content-Type": "application/json",
-    },
+  console.log(
+    `Remetente configurado no Resend: ${fromEmail}`
+  );
 
-    body: JSON.stringify({
-      from: fromEmail,
-      to: [email],
+  const resposta = await fetch(
+    "https://api.resend.com/emails",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${resendApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: fromEmail,
+        to: [email],
 
-      subject: "Seu acesso ao Knights Lab está liberado",
+        subject:
+          "Seu acesso ao Knights Lab está liberado",
 
-      html: `
-        <!DOCTYPE html>
+        html: `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+  <title>Seu acesso ao Knights Lab</title>
+</head>
 
-        <html lang="pt-BR">
+<body
+  style="
+    margin:0;
+    padding:0;
+    background:#0b0b0b;
+    font-family:Arial,Helvetica,sans-serif;
+    color:#ffffff;
+  "
+>
+  <div
+    style="
+      max-width:600px;
+      margin:0 auto;
+      padding:40px 20px;
+    "
+  >
+    <div
+      style="
+        background:#151515;
+        border:1px solid #292929;
+        border-radius:16px;
+        padding:32px;
+      "
+    >
 
-          <head>
-            <meta charset="UTF-8" />
-            <meta
-              name="viewport"
-              content="width=device-width, initial-scale=1.0"
-            />
+      <h1
+        style="
+          margin:0 0 16px;
+          font-size:28px;
+          color:#ffffff;
+        "
+      >
+        Seu acesso está liberado! 🎉
+      </h1>
 
-            <title>
-              Seu acesso ao Knights Lab
-            </title>
-          </head>
+      <p
+        style="
+          font-size:16px;
+          line-height:1.6;
+          color:#d0d0d0;
+        "
+      >
+        Sua compra foi confirmada e seu acesso ao
+        <strong>Knights Lab</strong>
+        está liberado.
+      </p>
 
-          <body
-            style="
-              margin:0;
-              padding:0;
-              background:#0b0b0b;
-              font-family:Arial,Helvetica,sans-serif;
-              color:#ffffff;
-            "
-          >
+      <div
+        style="
+          margin:28px 0;
+          padding:20px;
+          background:#0d0d0d;
+          border:1px solid #333333;
+          border-radius:12px;
+        "
+      >
 
-            <div
-              style="
-                max-width:600px;
-                margin:0 auto;
-                padding:40px 20px;
-              "
-            >
+        <p
+          style="
+            margin:0 0 10px;
+            color:#999999;
+            font-size:14px;
+          "
+        >
+          E-mail de acesso
+        </p>
 
-              <div
-                style="
-                  background:#151515;
-                  border:1px solid #292929;
-                  border-radius:16px;
-                  padding:32px;
-                "
-              >
+        <p
+          style="
+            margin:0 0 22px;
+            color:#ffffff;
+            font-size:16px;
+            word-break:break-word;
+          "
+        >
+          ${emailSeguro}
+        </p>
 
-                <h1
-                  style="
-                    margin:0 0 16px;
-                    font-size:28px;
-                    color:#ffffff;
-                  "
-                >
-                  Seu acesso está liberado! 🎉
-                </h1>
+        <p
+          style="
+            margin:0 0 10px;
+            color:#999999;
+            font-size:14px;
+          "
+        >
+          Sua senha
+        </p>
 
-                <p
-                  style="
-                    font-size:16px;
-                    line-height:1.6;
-                    color:#d0d0d0;
-                  "
-                >
-                  Sua compra foi confirmada e seu acesso ao
-                  <strong>Knights Lab</strong>
-                  está liberado.
-                </p>
+        <p
+          style="
+            margin:0;
+            color:#ffffff;
+            font-size:18px;
+            font-weight:bold;
+            letter-spacing:1px;
+            word-break:break-word;
+          "
+        >
+          ${senhaSegura}
+        </p>
 
-                <div
-                  style="
-                    margin:28px 0;
-                    padding:20px;
-                    background:#0d0d0d;
-                    border:1px solid #333333;
-                    border-radius:12px;
-                  "
-                >
+      </div>
 
-                  <p
-                    style="
-                      margin:0 0 12px;
-                      color:#999999;
-                      font-size:14px;
-                    "
-                  >
-                    E-mail de acesso
-                  </p>
+      <div
+        style="
+          text-align:center;
+          margin:32px 0;
+        "
+      >
+        <a
+          href="${siteUrlSeguro}/login"
+          style="
+            display:inline-block;
+            padding:15px 28px;
+            background:#2563eb;
+            color:#ffffff;
+            text-decoration:none;
+            border-radius:8px;
+            font-weight:bold;
+            font-size:16px;
+          "
+        >
+          Acessar minha área de membros
+        </a>
+      </div>
 
-                  <p
-                    style="
-                      margin:0 0 20px;
-                      color:#ffffff;
-                      font-size:16px;
-                      word-break:break-word;
-                    "
-                  >
-                    ${emailSeguro}
-                  </p>
+      <p
+        style="
+          font-size:14px;
+          line-height:1.6;
+          color:#999999;
+        "
+      >
+        Clique no botão acima para acessar sua área de membros.
+      </p>
 
-                  <p
-                    style="
-                      margin:0 0 12px;
-                      color:#999999;
-                      font-size:14px;
-                    "
-                  >
-                    Sua senha
-                  </p>
+      <p
+        style="
+          font-size:14px;
+          line-height:1.6;
+          color:#999999;
+        "
+      >
+        Use o e-mail e a senha informados neste e-mail para entrar.
+      </p>
 
-                  <p
-                    style="
-                      margin:0;
-                      color:#ffffff;
-                      font-size:18px;
-                      font-weight:bold;
-                      letter-spacing:1px;
-                      word-break:break-word;
-                    "
-                  >
-                    ${senhaSegura}
-                  </p>
+      <p
+        style="
+          font-size:14px;
+          line-height:1.6;
+          color:#999999;
+        "
+      >
+        Guarde este e-mail para consultar seus dados de acesso.
+      </p>
 
-                </div>
+      <p
+        style="
+          font-size:14px;
+          line-height:1.6;
+          color:#999999;
+        "
+      >
+        Se você não reconhece esta compra, entre em contato com nosso suporte.
+      </p>
 
-                <div
-                  style="
-                    text-align:center;
-                    margin:32px 0;
-                  "
-                >
+    </div>
 
-                  <a
-                    href="${siteUrlSeguro}/login"
-                    style="
-                      display:inline-block;
-                      padding:15px 28px;
-                      background:#2563eb;
-                      color:#ffffff;
-                      text-decoration:none;
-                      border-radius:8px;
-                      font-weight:bold;
-                      font-size:16px;
-                    "
-                  >
-                    Acessar minha área de membros
-                  </a>
+    <p
+      style="
+        text-align:center;
+        margin-top:24px;
+        color:#666666;
+        font-size:12px;
+      "
+    >
+      Knights Lab
+    </p>
 
-                </div>
+  </div>
+</body>
+</html>
+        `,
 
-                <p
-                  style="
-                    font-size:14px;
-                    line-height:1.6;
-                    color:#999999;
-                  "
-                >
-                  Clique no botão acima para acessar sua área de membros.
-                </p>
-
-                <p
-                  style="
-                    font-size:14px;
-                    line-height:1.6;
-                    color:#999999;
-                  "
-                >
-                  Guarde este e-mail para consultar seus dados de acesso.
-                </p>
-
-                <p
-                  style="
-                    font-size:14px;
-                    line-height:1.6;
-                    color:#999999;
-                  "
-                >
-                  Se você não solicitou este acesso, entre em contato
-                  com nosso suporte.
-                </p>
-
-              </div>
-
-              <p
-                style="
-                  text-align:center;
-                  margin-top:24px;
-                  color:#666666;
-                  font-size:12px;
-                "
-              >
-                Knights Lab
-              </p>
-
-            </div>
-
-          </body>
-
-        </html>
-      `,
-
-      text: `
+        text: `
 Seu acesso ao Knights Lab está liberado!
 
 Sua compra foi confirmada e seu acesso está liberado.
@@ -294,24 +318,45 @@ ${siteUrl}/login
 Guarde este e-mail para consultar seus dados de acesso.
 
 Knights Lab
-      `,
-    }),
-  });
+        `,
+      }),
+    }
+  );
 
-  const resultado = await resposta.json().catch(() => null);
+  const resultado = await resposta
+    .json()
+    .catch(() => null);
 
   if (!resposta.ok) {
     console.error(
-      "Erro retornado pelo Resend:",
-      resultado
+      "RESEND REJEITOU O ENVIO:",
+      {
+        status: resposta.status,
+        resultado,
+      }
     );
 
     throw new Error(
       resultado?.message ||
         resultado?.error ||
-        "O Resend não conseguiu enviar o e-mail."
+        `Resend retornou HTTP ${resposta.status}.`
     );
   }
+
+  if (!resultado?.id) {
+    console.error(
+      "Resend respondeu sem ID:",
+      resultado
+    );
+
+    throw new Error(
+      "O Resend respondeu sem fornecer o ID do e-mail."
+    );
+  }
+
+  console.log(
+    `E-mail enviado pelo Resend com sucesso. ID: ${resultado.id}`
+  );
 
   return resultado;
 }
@@ -322,7 +367,7 @@ export async function POST(request: Request) {
 
     /*
      * ============================================================
-     * VALIDAR WEBHOOK DA CAKTO
+     * 1. VALIDAR WEBHOOK DA CAKTO
      * ============================================================
      */
 
@@ -363,7 +408,7 @@ export async function POST(request: Request) {
 
     /*
      * ============================================================
-     * PEGAR EVENTO E E-MAIL
+     * 2. PEGAR EVENTO E E-MAIL
      * ============================================================
      */
 
@@ -376,13 +421,17 @@ export async function POST(request: Request) {
           )
         : "";
 
+    console.log(
+      "Webhook recebido:",
+      {
+        event,
+        email,
+      }
+    );
+
     if (!event || !email) {
       console.error(
-        "Webhook sem evento ou e-mail:",
-        {
-          event,
-          email,
-        }
+        "Webhook sem evento ou e-mail."
       );
 
       return NextResponse.json(
@@ -404,18 +453,18 @@ export async function POST(request: Request) {
 
     /*
      * ============================================================
-     * COMPRA APROVADA
+     * 3. COMPRA APROVADA
      * ============================================================
      */
 
     if (event === "purchase_approved") {
       console.log(
-        `Compra aprovada recebida para: ${email}`
+        `COMPRA APROVADA: ${email}`
       );
 
       /*
        * ----------------------------------------------------------
-       * 1. Procurar usuário existente
+       * 3.1 Procurar usuário existente
        * ----------------------------------------------------------
        */
 
@@ -438,6 +487,7 @@ export async function POST(request: Request) {
           {
             success: false,
             error:
+              buscaAuthError.message ||
               "Não foi possível verificar o usuário.",
           },
           { status: 500 }
@@ -454,13 +504,8 @@ export async function POST(request: Request) {
 
       /*
        * ----------------------------------------------------------
-       * 2. Gerar NOVA senha para esta compra
+       * 3.2 Gerar senha
        * ----------------------------------------------------------
-       *
-       * IMPORTANTE:
-       *
-       * Tanto usuário novo quanto usuário existente
-       * receberão uma senha válida.
        */
 
       const senhaGerada =
@@ -471,7 +516,7 @@ export async function POST(request: Request) {
 
       /*
        * ----------------------------------------------------------
-       * 3. Criar usuário ou atualizar senha
+       * 3.3 Criar ou atualizar usuário
        * ----------------------------------------------------------
        */
 
@@ -521,14 +566,6 @@ export async function POST(request: Request) {
           `Usuário criado no Supabase: ${email}`
         );
       } else {
-        /*
-         * Usuário já existe.
-         *
-         * Como não podemos recuperar a senha atual,
-         * definimos uma nova senha e enviamos essa senha
-         * para o comprador.
-         */
-
         usuarioId =
           usuarioExistente.id;
 
@@ -553,7 +590,7 @@ export async function POST(request: Request) {
           !usuarioAtualizado.user
         ) {
           console.error(
-            "Erro ao atualizar senha do usuário:",
+            "Erro ao atualizar senha:",
             atualizarSenhaError
           );
 
@@ -569,13 +606,13 @@ export async function POST(request: Request) {
         }
 
         console.log(
-          `Senha atualizada com sucesso para: ${email}`
+          `Senha atualizada com sucesso: ${email}`
         );
       }
 
       /*
        * ----------------------------------------------------------
-       * 4. Liberar acesso em user_access
+       * 3.4 Liberar acesso
        * ----------------------------------------------------------
        */
 
@@ -601,6 +638,7 @@ export async function POST(request: Request) {
           {
             success: false,
             error:
+              acessoConsultaError.message ||
               "Não foi possível verificar o acesso.",
           },
           { status: 500 }
@@ -653,124 +691,70 @@ export async function POST(request: Request) {
       }
 
       console.log(
-        `Acesso liberado para: ${email}`
+        `Acesso liberado: ${email}`
       );
 
       /*
        * ----------------------------------------------------------
-       * 5. ENVIAR E-MAIL DE ACESSO PELO RESEND
+       * 3.5 Enviar e-mail pelo Resend
        * ----------------------------------------------------------
-       *
-       * AGORA O E-MAIL É ENVIADO SEMPRE.
-       *
-       * Antes o código fazia:
-       *
-       * if (usuarioCriado && senhaGerada)
-       *
-       * Isso fazia com que usuários existentes nunca
-       * recebessem o e-mail.
-       *
-       * Agora enviamos para todo purchase_approved.
        */
 
-      try {
-        console.log(
-          `Enviando e-mail de acesso pelo Resend para: ${email}`
-        );
+      console.log(
+        `Preparando e-mail de acesso para: ${email}`
+      );
 
-        const resultadoEmail =
-          await enviarEmailAcesso({
-            email,
-            senha: senhaGerada,
-            siteUrl,
-          });
+      const resultadoEmail =
+        await enviarEmailAcesso({
+          email,
+          senha: senhaGerada,
+          siteUrl,
+        });
 
-        console.log(
-          `E-mail de acesso enviado com sucesso para: ${email}`,
-          resultadoEmail?.id
-            ? `ID: ${resultadoEmail.id}`
-            : ""
-        );
+      /*
+       * ----------------------------------------------------------
+       * 3.6 SUCESSO
+       * ----------------------------------------------------------
+       */
 
-        /*
-         * --------------------------------------------------------
-         * SUCESSO COMPLETO
-         * --------------------------------------------------------
-         */
+      console.log(
+        `PROCESSO COMPLETO: ${email}`
+      );
 
-        return NextResponse.json(
-          {
-            success: true,
-            message:
-              "Compra aprovada, usuário configurado, acesso liberado e e-mail enviado.",
+      return NextResponse.json(
+        {
+          success: true,
 
-            email,
+          message:
+            "Compra aprovada, usuário configurado, acesso liberado e e-mail enviado.",
 
-            usuario_criado:
-              usuarioCriado,
+          email,
 
-            usuario_id:
-              usuarioId,
+          usuario_criado:
+            usuarioCriado,
 
-            acesso_liberado:
-              true,
+          usuario_id:
+            usuarioId,
 
-            email_enviado:
-              true,
+          acesso_liberado:
+            true,
 
-            resend_id:
-              resultadoEmail?.id ||
-              null,
+          email_enviado:
+            true,
 
-            acesso: acessoFinal,
-          },
-          { status: 200 }
-        );
-      } catch (emailError) {
-        /*
-         * O usuário e o acesso já foram criados,
-         * mas o Resend falhou.
-         *
-         * Retornamos 500 para a Cakto saber que houve
-         * problema e registramos tudo nos logs da Vercel.
-         */
+          resend_id:
+            resultadoEmail.id,
 
-        console.error(
-          "USUÁRIO CRIADO/ATUALIZADO, MAS E-MAIL NÃO FOI ENVIADO:",
-          emailError
-        );
-
-        return NextResponse.json(
-          {
-            success: false,
-
-            error:
-              emailError instanceof Error
-                ? emailError.message
-                : "Não foi possível enviar o e-mail de acesso.",
-
-            email,
-
-            usuario_criado:
-              usuarioCriado,
-
-            usuario_id:
-              usuarioId,
-
-            acesso_liberado:
-              true,
-
-            email_enviado:
-              false,
-          },
-          { status: 500 }
-        );
-      }
+          acesso:
+            acessoFinal,
+        },
+        { status: 200 }
+      );
     }
 
     /*
      * ============================================================
-     * REEMBOLSO / CHARGEBACK
+     * 4. REEMBOLSO / CHARGEBACK
      * ============================================================
      */
 
@@ -778,6 +762,10 @@ export async function POST(request: Request) {
       event === "refund" ||
       event === "chargeback"
     ) {
+      console.log(
+        `Evento ${event} recebido para: ${email}`
+      );
+
       const {
         data,
         error,
@@ -795,7 +783,7 @@ export async function POST(request: Request) {
 
       if (error) {
         console.error(
-          "Erro ao bloquear acesso pela Cakto:",
+          "Erro ao bloquear acesso:",
           error
         );
 
@@ -803,6 +791,7 @@ export async function POST(request: Request) {
           {
             success: false,
             error:
+              error.message ||
               "Não foi possível bloquear o acesso.",
           },
           { status: 500 }
@@ -810,7 +799,7 @@ export async function POST(request: Request) {
       }
 
       console.log(
-        `Acesso bloqueado pela Cakto para: ${email}`
+        `Acesso bloqueado: ${email}`
       );
 
       return NextResponse.json(
@@ -827,7 +816,7 @@ export async function POST(request: Request) {
 
     /*
      * ============================================================
-     * EVENTO NÃO TRATADO
+     * 5. EVENTO NÃO TRATADO
      * ============================================================
      */
 
@@ -839,26 +828,26 @@ export async function POST(request: Request) {
       {
         success: true,
         message:
-          "Evento recebido.",
+          "Evento recebido sem ação.",
         event,
       },
       { status: 200 }
     );
   } catch (error) {
-  console.error(
-    "ERRO COMPLETO NO WEBHOOK CAKTO:",
-    error
-  );
+    console.error(
+      "ERRO COMPLETO NO WEBHOOK CAKTO:",
+      error
+    );
 
-  return NextResponse.json(
-    {
-      success: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : String(error),
-    },
-    { status: 500 }
-  );
-}
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      },
+      { status: 500 }
+    );
+  }
 }
