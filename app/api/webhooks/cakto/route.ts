@@ -67,21 +67,33 @@ async function enviarEmailAcesso({
 
   const resposta = await fetch("https://api.resend.com/emails", {
     method: "POST",
+
     headers: {
       Authorization: `Bearer ${resendApiKey}`,
       "Content-Type": "application/json",
     },
+
     body: JSON.stringify({
       from: fromEmail,
       to: [email],
+
       subject: "Seu acesso ao Knights Lab está liberado",
+
       html: `
         <!DOCTYPE html>
+
         <html lang="pt-BR">
+
           <head>
             <meta charset="UTF-8" />
-            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-            <title>Seu acesso ao Knights Lab</title>
+            <meta
+              name="viewport"
+              content="width=device-width, initial-scale=1.0"
+            />
+
+            <title>
+              Seu acesso ao Knights Lab
+            </title>
           </head>
 
           <body
@@ -93,6 +105,7 @@ async function enviarEmailAcesso({
               color:#ffffff;
             "
           >
+
             <div
               style="
                 max-width:600px;
@@ -100,6 +113,7 @@ async function enviarEmailAcesso({
                 padding:40px 20px;
               "
             >
+
               <div
                 style="
                   background:#151515;
@@ -108,6 +122,7 @@ async function enviarEmailAcesso({
                   padding:32px;
                 "
               >
+
                 <h1
                   style="
                     margin:0 0 16px;
@@ -115,7 +130,7 @@ async function enviarEmailAcesso({
                     color:#ffffff;
                   "
                 >
-                  Sua compra foi confirmada! 🎉
+                  Seu acesso está liberado! 🎉
                 </h1>
 
                 <p
@@ -125,7 +140,9 @@ async function enviarEmailAcesso({
                     color:#d0d0d0;
                   "
                 >
-                  Seu acesso ao <strong>Knights Lab</strong> está liberado.
+                  Sua compra foi confirmada e seu acesso ao
+                  <strong>Knights Lab</strong>
+                  está liberado.
                 </p>
 
                 <div
@@ -137,6 +154,7 @@ async function enviarEmailAcesso({
                     border-radius:12px;
                   "
                 >
+
                   <p
                     style="
                       margin:0 0 12px;
@@ -180,9 +198,16 @@ async function enviarEmailAcesso({
                   >
                     ${senhaSegura}
                   </p>
+
                 </div>
 
-                <div style="text-align:center;margin:32px 0;">
+                <div
+                  style="
+                    text-align:center;
+                    margin:32px 0;
+                  "
+                >
+
                   <a
                     href="${siteUrlSeguro}/login"
                     style="
@@ -198,7 +223,18 @@ async function enviarEmailAcesso({
                   >
                     Acessar minha área de membros
                   </a>
+
                 </div>
+
+                <p
+                  style="
+                    font-size:14px;
+                    line-height:1.6;
+                    color:#999999;
+                  "
+                >
+                  Clique no botão acima para acessar sua área de membros.
+                </p>
 
                 <p
                   style="
@@ -217,9 +253,10 @@ async function enviarEmailAcesso({
                     color:#999999;
                   "
                 >
-                  Se você não solicitou este acesso, entre em contato com
-                  nosso suporte.
+                  Se você não solicitou este acesso, entre em contato
+                  com nosso suporte.
                 </p>
+
               </div>
 
               <p
@@ -232,14 +269,18 @@ async function enviarEmailAcesso({
               >
                 Knights Lab
               </p>
+
             </div>
+
           </body>
+
         </html>
       `,
-      text: `
-Sua compra foi confirmada!
 
-Seu acesso ao Knights Lab está liberado.
+      text: `
+Seu acesso ao Knights Lab está liberado!
+
+Sua compra foi confirmada e seu acesso está liberado.
 
 E-mail:
 ${email}
@@ -260,7 +301,10 @@ Knights Lab
   const resultado = await resposta.json().catch(() => null);
 
   if (!resposta.ok) {
-    console.error("Erro retornado pelo Resend:", resultado);
+    console.error(
+      "Erro retornado pelo Resend:",
+      resultado
+    );
 
     throw new Error(
       resultado?.message ||
@@ -276,11 +320,20 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
+    /*
+     * ============================================================
+     * VALIDAR WEBHOOK DA CAKTO
+     * ============================================================
+     */
+
     const secretRecebida = body?.secret;
-    const secretEsperada = process.env.CAKTO_WEBHOOK_SECRET;
+    const secretEsperada =
+      process.env.CAKTO_WEBHOOK_SECRET;
 
     if (!secretEsperada) {
-      console.error("CAKTO_WEBHOOK_SECRET não configurada.");
+      console.error(
+        "CAKTO_WEBHOOK_SECRET não configurada."
+      );
 
       return NextResponse.json(
         {
@@ -295,7 +348,9 @@ export async function POST(request: Request) {
       typeof secretRecebida !== "string" ||
       secretRecebida !== secretEsperada
     ) {
-      console.error("Webhook Cakto rejeitado: chave inválida.");
+      console.error(
+        "Webhook Cakto rejeitado: chave inválida."
+      );
 
       return NextResponse.json(
         {
@@ -306,24 +361,42 @@ export async function POST(request: Request) {
       );
     }
 
+    /*
+     * ============================================================
+     * PEGAR EVENTO E E-MAIL
+     * ============================================================
+     */
+
     const event = body?.event;
 
     const email =
       typeof body?.data?.customer?.email === "string"
-        ? normalizarEmail(body.data.customer.email)
+        ? normalizarEmail(
+            body.data.customer.email
+          )
         : "";
 
     if (!event || !email) {
+      console.error(
+        "Webhook sem evento ou e-mail:",
+        {
+          event,
+          email,
+        }
+      );
+
       return NextResponse.json(
         {
           success: false,
-          error: "Evento ou e-mail do cliente não encontrado.",
+          error:
+            "Evento ou e-mail do cliente não encontrado.",
         },
         { status: 400 }
       );
     }
 
-    const supabaseAdmin = criarSupabaseAdmin();
+    const supabaseAdmin =
+      criarSupabaseAdmin();
 
     const siteUrl =
       process.env.NEXT_PUBLIC_SITE_URL ||
@@ -336,17 +409,24 @@ export async function POST(request: Request) {
      */
 
     if (event === "purchase_approved") {
+      console.log(
+        `Compra aprovada recebida para: ${email}`
+      );
+
       /*
-       * Procurar usuário existente.
+       * ----------------------------------------------------------
+       * 1. Procurar usuário existente
+       * ----------------------------------------------------------
        */
 
       const {
         data: usuarios,
         error: buscaAuthError,
-      } = await supabaseAdmin.auth.admin.listUsers({
-        page: 1,
-        perPage: 1000,
-      });
+      } =
+        await supabaseAdmin.auth.admin.listUsers({
+          page: 1,
+          perPage: 1000,
+        });
 
       if (buscaAuthError) {
         console.error(
@@ -357,40 +437,65 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             success: false,
-            error: "Não foi possível verificar o usuário.",
+            error:
+              "Não foi possível verificar o usuário.",
           },
           { status: 500 }
         );
       }
 
-      const usuarioExistente = usuarios.users.find(
-        (usuario) =>
-          usuario.email?.trim().toLowerCase() === email
-      );
-
-      let usuarioCriado = false;
-      let senhaGerada: string | null = null;
+      const usuarioExistente =
+        usuarios.users.find(
+          (usuario) =>
+            usuario.email
+              ?.trim()
+              .toLowerCase() === email
+        );
 
       /*
-       * ============================================================
-       * CRIAR USUÁRIO NOVO
-       * ============================================================
+       * ----------------------------------------------------------
+       * 2. Gerar NOVA senha para esta compra
+       * ----------------------------------------------------------
+       *
+       * IMPORTANTE:
+       *
+       * Tanto usuário novo quanto usuário existente
+       * receberão uma senha válida.
+       */
+
+      const senhaGerada =
+        gerarSenhaAleatoria();
+
+      let usuarioId: string;
+      let usuarioCriado = false;
+
+      /*
+       * ----------------------------------------------------------
+       * 3. Criar usuário ou atualizar senha
+       * ----------------------------------------------------------
        */
 
       if (!usuarioExistente) {
-        senhaGerada = gerarSenhaAleatoria();
+        console.log(
+          `Usuário não existe. Criando: ${email}`
+        );
 
         const {
           data: novoUsuario,
           error: usuarioError,
         } =
-          await supabaseAdmin.auth.admin.createUser({
-            email,
-            password: senhaGerada,
-            email_confirm: true,
-          });
+          await supabaseAdmin.auth.admin.createUser(
+            {
+              email,
+              password: senhaGerada,
+              email_confirm: true,
+            }
+          );
 
-        if (usuarioError || !novoUsuario.user) {
+        if (
+          usuarioError ||
+          !novoUsuario.user
+        ) {
           console.error(
             "Erro ao criar usuário:",
             usuarioError
@@ -407,27 +512,84 @@ export async function POST(request: Request) {
           );
         }
 
+        usuarioId =
+          novoUsuario.user.id;
+
         usuarioCriado = true;
 
         console.log(
-          `Usuário criado no Supabase para: ${email}`
+          `Usuário criado no Supabase: ${email}`
+        );
+      } else {
+        /*
+         * Usuário já existe.
+         *
+         * Como não podemos recuperar a senha atual,
+         * definimos uma nova senha e enviamos essa senha
+         * para o comprador.
+         */
+
+        usuarioId =
+          usuarioExistente.id;
+
+        console.log(
+          `Usuário já existe. Atualizando senha: ${email}`
+        );
+
+        const {
+          data: usuarioAtualizado,
+          error: atualizarSenhaError,
+        } =
+          await supabaseAdmin.auth.admin.updateUserById(
+            usuarioId,
+            {
+              password: senhaGerada,
+              email_confirm: true,
+            }
+          );
+
+        if (
+          atualizarSenhaError ||
+          !usuarioAtualizado.user
+        ) {
+          console.error(
+            "Erro ao atualizar senha do usuário:",
+            atualizarSenhaError
+          );
+
+          return NextResponse.json(
+            {
+              success: false,
+              error:
+                atualizarSenhaError?.message ||
+                "Não foi possível atualizar a senha do usuário.",
+            },
+            { status: 500 }
+          );
+        }
+
+        console.log(
+          `Senha atualizada com sucesso para: ${email}`
         );
       }
 
       /*
-       * ============================================================
-       * ATIVAR ACESSO
-       * ============================================================
+       * ----------------------------------------------------------
+       * 4. Liberar acesso em user_access
+       * ----------------------------------------------------------
        */
 
       const {
         data: acessoExistente,
         error: acessoConsultaError,
-      } = await supabaseAdmin
-        .from("user_access")
-        .select("id, email, active, role")
-        .eq("email", email)
-        .maybeSingle();
+      } =
+        await supabaseAdmin
+          .from("user_access")
+          .select(
+            "id, email, active, role"
+          )
+          .eq("email", email)
+          .maybeSingle();
 
       if (acessoConsultaError) {
         console.error(
@@ -438,34 +600,42 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             success: false,
-            error: "Não foi possível verificar o acesso.",
+            error:
+              "Não foi possível verificar o acesso.",
           },
           { status: 500 }
         );
       }
 
       const roleFinal =
-        acessoExistente?.role || "user";
+        acessoExistente?.role ||
+        "user";
 
       const {
         data: acessoFinal,
         error: acessoUpsertError,
-      } = await supabaseAdmin
-        .from("user_access")
-        .upsert(
-          {
-            email,
-            active: true,
-            role: roleFinal,
-          },
-          {
-            onConflict: "email",
-          }
-        )
-        .select("id, email, active, role")
-        .single();
+      } =
+        await supabaseAdmin
+          .from("user_access")
+          .upsert(
+            {
+              email,
+              active: true,
+              role: roleFinal,
+            },
+            {
+              onConflict: "email",
+            }
+          )
+          .select(
+            "id, email, active, role"
+          )
+          .single();
 
-      if (acessoUpsertError || !acessoFinal) {
+      if (
+        acessoUpsertError ||
+        !acessoFinal
+      ) {
         console.error(
           "Erro ao sincronizar user_access:",
           acessoUpsertError
@@ -482,72 +652,120 @@ export async function POST(request: Request) {
         );
       }
 
+      console.log(
+        `Acesso liberado para: ${email}`
+      );
+
       /*
-       * ============================================================
-       * ENVIAR E-MAIL DE ACESSO
-       * ============================================================
+       * ----------------------------------------------------------
+       * 5. ENVIAR E-MAIL DE ACESSO PELO RESEND
+       * ----------------------------------------------------------
        *
-       * Envia senha somente quando o usuário acabou de ser criado.
+       * AGORA O E-MAIL É ENVIADO SEMPRE.
        *
-       * Isso evita trocar a senha de um cliente existente
-       * caso a Cakto reenvie o mesmo webhook.
+       * Antes o código fazia:
+       *
+       * if (usuarioCriado && senhaGerada)
+       *
+       * Isso fazia com que usuários existentes nunca
+       * recebessem o e-mail.
+       *
+       * Agora enviamos para todo purchase_approved.
        */
 
-      if (usuarioCriado && senhaGerada) {
-        try {
-          const resultadoEmail =
-            await enviarEmailAcesso({
-              email,
-              senha: senhaGerada,
-              siteUrl,
-            });
+      try {
+        console.log(
+          `Enviando e-mail de acesso pelo Resend para: ${email}`
+        );
 
-          console.log(
-            `E-mail de acesso enviado pelo Resend para: ${email}`,
-            resultadoEmail?.id
-              ? `ID: ${resultadoEmail.id}`
-              : ""
-          );
-        } catch (emailError) {
-          console.error(
-            "Usuário criado e acesso liberado, mas o e-mail não foi enviado:",
-            emailError
-          );
+        const resultadoEmail =
+          await enviarEmailAcesso({
+            email,
+            senha: senhaGerada,
+            siteUrl,
+          });
 
-          return NextResponse.json(
-            {
-              success: false,
-              error:
-                emailError instanceof Error
-                  ? emailError.message
-                  : "Usuário criado, mas não foi possível enviar o e-mail de acesso.",
-              email,
-              usuario_criado: true,
-              acesso_liberado: true,
-              email_enviado: false,
-            },
-            { status: 500 }
-          );
-        }
+        console.log(
+          `E-mail de acesso enviado com sucesso para: ${email}`,
+          resultadoEmail?.id
+            ? `ID: ${resultadoEmail.id}`
+            : ""
+        );
+
+        /*
+         * --------------------------------------------------------
+         * SUCESSO COMPLETO
+         * --------------------------------------------------------
+         */
+
+        return NextResponse.json(
+          {
+            success: true,
+            message:
+              "Compra aprovada, usuário configurado, acesso liberado e e-mail enviado.",
+
+            email,
+
+            usuario_criado:
+              usuarioCriado,
+
+            usuario_id:
+              usuarioId,
+
+            acesso_liberado:
+              true,
+
+            email_enviado:
+              true,
+
+            resend_id:
+              resultadoEmail?.id ||
+              null,
+
+            acesso: acessoFinal,
+          },
+          { status: 200 }
+        );
+      } catch (emailError) {
+        /*
+         * O usuário e o acesso já foram criados,
+         * mas o Resend falhou.
+         *
+         * Retornamos 500 para a Cakto saber que houve
+         * problema e registramos tudo nos logs da Vercel.
+         */
+
+        console.error(
+          "USUÁRIO CRIADO/ATUALIZADO, MAS E-MAIL NÃO FOI ENVIADO:",
+          emailError
+        );
+
+        return NextResponse.json(
+          {
+            success: false,
+
+            error:
+              emailError instanceof Error
+                ? emailError.message
+                : "Não foi possível enviar o e-mail de acesso.",
+
+            email,
+
+            usuario_criado:
+              usuarioCriado,
+
+            usuario_id:
+              usuarioId,
+
+            acesso_liberado:
+              true,
+
+            email_enviado:
+              false,
+          },
+          { status: 500 }
+        );
       }
-
-      console.log(
-        `Acesso liberado pela Cakto para: ${email}`
-      );
-
-      return NextResponse.json(
-        {
-          success: true,
-          message:
-            "Compra aprovada, acesso liberado e processo de e-mail concluído.",
-          email,
-          usuario_criado: usuarioCriado,
-          acesso: acessoFinal,
-          email_enviado:
-            usuarioCriado && !!senhaGerada,
-        },
-        { status: 200 }
-      );
     }
 
     /*
@@ -563,14 +781,17 @@ export async function POST(request: Request) {
       const {
         data,
         error,
-      } = await supabaseAdmin
-        .from("user_access")
-        .update({
-          active: false,
-        })
-        .eq("email", email)
-        .select("id, email, active, role")
-        .maybeSingle();
+      } =
+        await supabaseAdmin
+          .from("user_access")
+          .update({
+            active: false,
+          })
+          .eq("email", email)
+          .select(
+            "id, email, active, role"
+          )
+          .maybeSingle();
 
       if (error) {
         console.error(
@@ -581,7 +802,8 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             success: false,
-            error: "Não foi possível bloquear o acesso.",
+            error:
+              "Não foi possível bloquear o acesso.",
           },
           { status: 500 }
         );
@@ -594,7 +816,8 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: true,
-          message: "Acesso bloqueado.",
+          message:
+            "Acesso bloqueado.",
           email,
           acesso: data,
         },
@@ -615,7 +838,8 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         success: true,
-        message: "Evento recebido.",
+        message:
+          "Evento recebido.",
         event,
       },
       { status: 200 }
