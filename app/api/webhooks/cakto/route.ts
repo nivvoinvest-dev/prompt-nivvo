@@ -845,20 +845,20 @@ export async function POST(request: Request) {
       { status: 200 }
     );
   } catch (error) {
-    console.error(
-      "Erro ao processar webhook da Cakto:",
-      error
-    );
+  console.error(
+    "ERRO COMPLETO NO WEBHOOK CAKTO:",
+    error
+  );
 
-    return NextResponse.json(
-      {
-        success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro interno ao processar webhook.",
-      },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json(
+    {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : String(error),
+    },
+    { status: 500 }
+  );
+}
 }
