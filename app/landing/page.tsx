@@ -77,7 +77,7 @@ export default function LandingPage() {
           </div>
 
           <p className="mt-4 text-center text-xs text-gray-600">
-            R$ 47,90 • Pagamento único • Acesso à Biblioteca Knights Lab
+            R$ 97,00 • Pagamento único • Acesso à Biblioteca Knights Lab
           </p>
         </div>
       </section>
@@ -470,7 +470,7 @@ export default function LandingPage() {
           <div className="mt-8">
 
             <span className="text-5xl font-bold tracking-tight">
-              R$ 47,90
+              R$ 97,00
             </span>
 
             <p className="mt-2 text-sm text-gray-500">
@@ -567,7 +567,7 @@ export default function LandingPage() {
         </h2>
 
         <p className="mx-auto mt-5 max-w-xl text-sm leading-6 text-gray-500">
-          Acesse a Biblioteca Knights Lab por R$ 47,90 em pagamento único.
+          Acesse a Biblioteca Knights Lab por R$ 97,00 em pagamento único.
         </p>
 
         <a
